@@ -1,0 +1,18 @@
+{
+  "main": "index.html",
+  "preload": "preload.js",
+  "logo": "logo.png",
+  "pluginSetting": {
+    "single": false
+  },
+  "features": [
+      {
+        "code": "scan-book",
+        "explain": "爬书神器",
+        "cmds": [
+          "pashu",
+          "steal"
+        ]
+      }
+  ]
+}

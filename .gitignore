@@ -1,0 +1,7 @@
+# system files
+**/.DS_Store
+**/package-lock.json
+# dependencies
+/node_modules
+# build output
+**/dist
