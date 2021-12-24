@@ -1,15 +1,5 @@
-let cheerio ;
-let request ;
-try {
-  cheerio = require("cheerio");
-  request = require("request");
-} catch (e) {
-  alert(e)
-}
-
-
-// const cheerio = require("cheerio");
-// const request = require("request");
+const cheerio = require("cheerio");
+const request = require("request");
 const iconv = require('iconv-lite');
 const jschardet = require("jschardet");
 const fs = require("fs");
@@ -475,7 +465,7 @@ window.services = {
     if (encodingCheck.confidence > 0.65) {
       _html = iconv.decode(buf, encodingCheck.encoding);
     } else {
-      _html = iconv.decode(buf, 'utf8');
+      _html = iconv.decode(buf, 'utf-8');
     }
     return _html;
   }
