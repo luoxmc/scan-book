@@ -306,6 +306,7 @@ window.services = {
           }
           let getChapterContent = function () {
             let result = '';
+            let tmpTxt = '';
             let contentReg = [ '.novel_content', '.box_box','.showtxt','.panel-body','.zw','*content','*text','*txt','*nr','*chapter','*cont','*article','*read' ];
             for (let i = 0; i < contentReg.length; i++) {
               let tmp;
@@ -327,7 +328,11 @@ window.services = {
                   continue;
                 }
                 let txt = $(tmp1).text();
-                if (txt &&  txt.length >= 300) {
+                if(txt && txt.length < 150){
+                  tmpTxt = txt;
+                  continue;
+                }
+                if (txt) {
                   let reg = /(正文)?(第)([零〇一二三四五六七八九十百千万a-zA-Z0-9]{1,7})[章节卷集部篇回]((?! {4}).)((?!\t{1,4}).){0,30}\r?\n/g;
                   txt = txt.replace(reg,'').replace(/\s/g, "");
                   result = txt;
@@ -337,6 +342,9 @@ window.services = {
               if (result) {
                 break;
               }
+            }
+            if(!result && tmpTxt){
+              result = tmpTxt;
             }
             return result;
           }
