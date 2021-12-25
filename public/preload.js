@@ -450,7 +450,9 @@ window.services = {
   },
   /***  将buffer转成格式正常的字符串  ***/
   getOkText: (buf) => {
-    let _html = '';
+    if(!buf || buf.length <= 0){
+      return '';
+    }
     //使用jschardet检查文件编码
     let encodingCheck = {};
     if (buf.byteLength > 8000) {
@@ -463,11 +465,10 @@ window.services = {
     }
     //用检查出来的编码将buffer转成字符串
     if (encodingCheck.confidence > 0.65) {
-      _html = iconv.decode(buf, encodingCheck.encoding);
+      return  iconv.decode(buf, encodingCheck.encoding);
     } else {
-      _html = iconv.decode(buf, 'utf-8');
+      return  iconv.decode(buf, 'utf-8');
     }
-    return _html;
   }
 }
 

@@ -98,6 +98,19 @@ export default class App extends React.Component {
       this.showTip("间隔时间最少200毫秒");
       return;
     }
+    let rule ;
+    if(this.state.rule){
+      try {
+        rule = JSON.parse(this.state.rule);
+        if(!rule.book_menu || !rule.book_name || !rule.chapter_title || !rule.chapter_content){
+          this.showTip("爬书规则不正确，请检查规则四要素是否都有配置");
+          return;
+        }
+      } catch (e) {
+        this.showTip("爬书规则格式不正确，请检查");
+        return;
+      }
+    }
     if(this.state.tasks){
       if(this.state.tasks.length >= 3){
         this.showTip("最多同时执行三个抓取任务，请稍后再试");
@@ -122,7 +135,7 @@ export default class App extends React.Component {
     } else if (this.state.tasks.length === 2 && Number(this.state.interval) > 400){
       interval = 400;
     }
-    window.services.getTask(this.state.bookUrl, interval ,this.state.rule,(res) => {
+    window.services.getTask(this.state.bookUrl, interval ,rule,(res) => {
       if(res.err_no === 0){
         let tasks = self.state.tasks;
         tasks.unshift(res.result);
@@ -346,7 +359,7 @@ export default class App extends React.Component {
             </Grid>
             <Grid item xs={12} sm={12}>
               <TextField value={this.state.rule} id="rule" label="抓取规则" placeholder="选填,请输入该网站的抓取规则(json格式)" multiline fullWidth margin="normal"
-                         maxRows={4} InputLabelProps={{shrink: true}} onChange={(e) => this.inputChange(e)}/>
+                         maxRows={6} InputLabelProps={{shrink: true}} onChange={(e) => this.inputChange(e)}/>
             </Grid>
             <Grid container xs={12} justifyContent="center" style={{paddingTop:'1rem'}}>
               <Grid item xs={4} sm={2} >
