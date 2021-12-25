@@ -435,8 +435,8 @@ window.services = {
   saveFile: (tmpPath,newPath) => {
     try {
       fs.renameSync(tmpPath,newPath);
-      fs.unlinkSync(tmpPath);
     } catch (e) {
+      console.log(e);
       return false;
     }
     return true;

@@ -167,6 +167,7 @@ export default class App extends React.Component {
               //爬取完成
               task.status = 2;
               task.statusText = '任务处理完成';
+              task.log += '<p style="color: rgba(155,223,51,0.83)"><span style="margin-right: 4px;padding: 1px 3px;border-radius: 2px;background: #cacaca45;">'+ new Date().format("yyyy-MM-dd hh:mm:ss")+'</span>书籍爬取完成</p>';
             }
           } else {
             task.status = 4;
@@ -299,7 +300,7 @@ export default class App extends React.Component {
     const { scrollHeight, scrollTop, clientHeight } = document.getElementById("logContent");
     if (scrollHeight - scrollTop === clientHeight) {
       scrollFlag = true;
-    } else if (scrollHeight - scrollTop > clientHeight + 100) {
+    } else if (scrollHeight - scrollTop > clientHeight + 130) {
       scrollFlag = false;
     }
 
@@ -389,7 +390,7 @@ export default class App extends React.Component {
                       <Divider />
                       <CardActions style={{padding:'4px 12px'}}>
                         <Button size="small" onClick={(e) => this.showLog(e,value)}>查看详情</Button>
-                        <Button size="small" color="primary" onClick={(e) => this.pauseTask(e,value)}>{pauseFlag[value.id] || value.status === 4 ? "恢复" : "暂停"}</Button>
+                        <Button size="small" style={{display: value.status === 2 ? 'none':'inline-flex'}} color="primary" onClick={(e) => this.pauseTask(e,value)}>{pauseFlag[value.id] || value.status === 4 ? "恢复" : "暂停"}</Button>
                         <Button size="small" style={{display: value.status === 0 ? 'none':'inline-flex'}} color={value.status === 2 ? "primary" : "secondary"} onClick={(e) => this.saveTxt(e,value)}>{value.status === 2 ? "保存" : "删除"}</Button>
                       </CardActions>
                     </Card>
