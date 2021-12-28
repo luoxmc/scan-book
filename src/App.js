@@ -158,7 +158,7 @@ export default class App extends React.Component {
     if(task && task.menu && task.menu.length > 0){
       let self = this;
       if(task.curChapter < task.menu.length){
-        window.services.getChapter(task, this.state.rule, (res) => {
+        window.services.getChapter(task, (res) => {
           task.log += res.log;
           if(res.err_no === 0){
             task.curChapter ++;
@@ -243,11 +243,11 @@ export default class App extends React.Component {
           if (oneTask.id === task.id) {
             let path = window.utools.getPath("temp") + separator + "scan-book" + separator + task.id + '.txt';
             let result = window.services.saveFile(path,savePath);
-            if(result){
+            if(result === 'ok'){
               self.showTip("保存成功");
               state.tasks.splice(i,1);
             } else {
-              self.showTip("保存失败，请稍后再试")
+              self.showTip(result);
             }
             break;
           }
@@ -437,11 +437,11 @@ export default class App extends React.Component {
                   <code>
                     <p style={{margin:0}}>{"{"}</p>
                     <p style={{margin:0,color:'#979798'}}>{"  //书名"}</p>
-                    <p style={{margin:0}}><span style={{color:'#f8c555'}}>  "book_name"</span>:<span style={{color:'#7ec699'}}> ".header h1",</span></p>
+                    <p style={{margin:0}}><span style={{color:'#f8c555'}}>  "book_name"</span>:<span style={{color:'#7ec699'}}> ".header h1"</span>,</p>
                     <p style={{margin:0,color:'#979798'}}>{"  //章节目录列表，选择器定位到a标签"}</p>
-                    <p style={{margin:0}}><span style={{color:'#f8c555'}}>  "book_menu"</span>:<span style={{color:'#7ec699'}}> "#content ul li a",</span></p>
+                    <p style={{margin:0}}><span style={{color:'#f8c555'}}>  "book_menu"</span>:<span style={{color:'#7ec699'}}> "#content ul li a"</span>,</p>
                     <p style={{margin:0,color:'#979798'}}>{"  //每一个章节的标题"}</p>
-                    <p style={{margin:0}}><span style={{color:'#f8c555'}}>  "chapter_title"</span>:<span style={{color:'#7ec699'}}> "#title h1",</span></p>
+                    <p style={{margin:0}}><span style={{color:'#f8c555'}}>  "chapter_title"</span>:<span style={{color:'#7ec699'}}> "#title h1"</span>,</p>
                     <p style={{margin:0,color:'#979798'}}>{"  //章节正文内容"}</p>
                     <p style={{margin:0}}><span style={{color:'#f8c555'}}>  "chapter_content"</span>:<span style={{color:'#7ec699'}}> "#content"</span></p>
                     <p style={{margin:0}}>{"}"}</p>

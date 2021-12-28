@@ -44,139 +44,163 @@ window.services = {
         } else {
           $ = cheerio.load(_html);
           let getBookName = function () {
-            let result = '';
-            let nameReg = ['.pt-name a', '.title span', '.f20h', '.caption p', "*title", "*name", 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'h3 a'];
-            for (let i = 0; i < nameReg.length; i++) {
-              let tmp;
-              if (nameReg[i].startsWith("*")) {
-                let attr = nameReg[i].replace("*", "");
-                tmp = $("[id*=" + attr + "]");
-                if (tmp.length <= 0) {
-                  tmp = $("[class*=" + attr + "]");
+            try {
+              let result = '';
+              let nameReg = ['.book-info h1 em', '.pt-name a', '.title span', '.f20h', '.caption p', "*title", "*name", 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'h3 a'];
+              for (let i = 0; i < nameReg.length; i++) {
+                let tmp;
+                if (nameReg[i].startsWith("*")) {
+                  let attr = nameReg[i].replace("*", "");
+                  tmp = $("[id*=" + attr + "] h1");
+                  if (tmp.length <= 0) {
+                    tmp = $("[class*=" + attr + "] h1");
+                  }
+                  if (tmp.length <= 0) {
+                    tmp = $("[id*=" + attr + "]");
+                  }
+                  if (tmp.length <= 0) {
+                    tmp = $("[class*=" + attr + "]");
+                  }
+                } else {
+                  tmp = $(nameReg[i]);
                 }
-              } else {
-                tmp = $(nameReg[i]);
-              }
-              if (tmp.length <= 0) {
-                continue;
-              }
-              for (let j = 0; j < tmp.length; j++) {
-                let tmp1 = tmp[j];
-                if (tmp1.children.length !== 1) {
+                if (tmp.length <= 0) {
                   continue;
                 }
-                let txt = tmp1.children[0].data;
-                if (txt && txt.length >= 2 && txt.length <= 20) {
-                  if(txt.indexOf('友情链接') !== -1){
+                for (let j = 0; j < tmp.length; j++) {
+                  let tmp1 = tmp[j];
+                  if (tmp1.children.length !== 1) {
                     continue;
                   }
-                  result = txt;
-                  break;
-                }
-              }
-              if (result) {
-                break;
-              }
-            }
-            return result;
-          }
-          let getBookMenu = function () {
-            let result = [];
-            let menuReg = ['.booklist span a', "#chapterlist p", '.ccss a', '.book-section a', '*menu', '*list', 'ul li a', 'dl dd a', 'tr td a'];
-            for (let i = 0; i < menuReg.length; i++) {
-              let tmp;
-              if (menuReg[i].startsWith("*")) {
-                let attr = menuReg[i].replace("*", "");
-                tmp = $("[id*=" + attr + "] ul li a");
-                if (tmp.length <= 5) {
-                  tmp = $("[class*=" + attr + "] ul li a");
-                }
-                if (tmp.length <= 5) {
-                  tmp = $("[id*=" + attr + "] dl dd a");
-                }
-                if (tmp.length <= 5) {
-                  tmp = $("[class*=" + attr + "] dl dd a");
-                }
-                if (tmp.length <= 5) {
-                  tmp = $("[id*=" + attr + "] tr td a");
-                }
-                if (tmp.length <= 5) {
-                  tmp = $("[class*=" + attr + "] tr td a");
-                }
-                if (tmp.length <= 5) {
-                  tmp = $("[id*=" + attr + "] a");
-                }
-                if (tmp.length <= 5) {
-                  tmp = $("[class*=" + attr + "] a");
-                }
-              } else {
-                tmp = $(menuReg[i]);
-              }
-              if (tmp.length <= 5) {
-                continue;
-              }
-              result = checkMenus(tmp);
-              if (result && result.length > 0) {
-                break;
-              }
-            }
-            return result;
-          }
-          let checkMenus = function ($ele) {
-            let result = [];
-            let start = false;
-            for (let j = 0; j < $ele.length; j++) {
-              let tmp = $ele[j];
-              let href = tmp.attribs.href;
-              if (!href || href === '#' || href.indexOf('javascript') !== -1) {
-                continue;
-              }
-              let txt = '';
-              if (tmp.children.length === 1 && tmp.children[0].type === 'text') {
-                txt = tmp.children[0].data;
-                if (txt) {
-                  txt = txt.replace(/\s+/g, '');
-                }
-              }
-              if (!txt) {
-                for (let k = 0; k < tmp.children.length; k++) {
-                  if (tmp.children[k].name === 'span') {
-                    txt = tmp.children[k].children[0].data;
+                  let txt = tmp1.children[0].data;
+                  if (txt && txt.length >= 2 && txt.length <= 20) {
+                    if(txt.indexOf('友情链接') !== -1){
+                      continue;
+                    }
+                    result = txt;
                     break;
                   }
                 }
-                if (!txt) {
-                  continue;
+                if (result) {
+                  break;
                 }
               }
-              if (txt.indexOf("第一章") !== -1 || txt.indexOf("第1章") !== -1 || txt.indexOf("序") !== -1 || txt.indexOf("楔子") !== -1 || txt.indexOf("前言") !== -1
-                  || txt.indexOf("第一卷") !== -1 || txt.indexOf("第1卷") !== -1 || txt.indexOf("第一回") !== -1 || txt.indexOf("第1回") !== -1 || txt.indexOf("第01章") !== -1
-                  || txt.indexOf("第001章") !== -1 || txt.indexOf("第0001章") !== -1) {
-                start = true;
+              return result;
+            } catch (e) {
+              console.log(e);
+              return null;
+            }
+          }
+          let getBookMenu = function () {
+            try {
+              let result = [];
+              let menuReg = ['.volume-wrap ul li a', '.booklist span a', "#chapterlist p", '.ccss a', '.book-section a', '*menu', '*list', 'ul li a', 'dl dd a', 'tr td a'];
+              for (let i = 0; i < menuReg.length; i++) {
+                let tmp;
+                if (menuReg[i].startsWith("*")) {
+                  let attr = menuReg[i].replace("*", "");
+                  tmp = $("[id*=" + attr + "] ul li a");
+                  if (tmp.length <= 5) {
+                    tmp = $("[class*=" + attr + "] ul li a");
+                  }
+                  if (tmp.length <= 5) {
+                    tmp = $("[id*=" + attr + "] dl dd a");
+                  }
+                  if (tmp.length <= 5) {
+                    tmp = $("[class*=" + attr + "] dl dd a");
+                  }
+                  if (tmp.length <= 5) {
+                    tmp = $("[id*=" + attr + "] tr td a");
+                  }
+                  if (tmp.length <= 5) {
+                    tmp = $("[class*=" + attr + "] tr td a");
+                  }
+                  if (tmp.length <= 5) {
+                    tmp = $("[id*=" + attr + "] a");
+                  }
+                  if (tmp.length <= 5) {
+                    tmp = $("[class*=" + attr + "] a");
+                  }
+                } else {
+                  tmp = $(menuReg[i]);
+                }
+                if (tmp.length <= 5) {
+                  continue;
+                }
+                console.log(tmp);
+                result = checkMenus(tmp);
+                if (result && result.length > 0) {
+                  break;
+                }
               }
-              if (start) {
-                if (href.startsWith("/chapter/")) {
-                  href = url.substring(0, url.indexOf("//") + 2) + url.substring(url.indexOf("//") + 2).substring(0, url.substring(url.indexOf("//") + 2).indexOf("/")) + href;
-                } else if (href.startsWith("http")) {
+              return result;
+            } catch (e) {
+              console.log(e);
+              return null;
+            }
+          }
+          let checkMenus = function ($ele) {
+            try {
+              let result = [];
+              let start = false;
+              for (let j = 0; j < $ele.length; j++) {
+                let tmp = $ele[j];
+                let href = tmp.attribs.href;
+                if (!href || href === '#' || href.indexOf('javascript') !== -1) {
+                  continue;
+                }
+                let txt = '';
+                if (tmp.children.length === 1 && tmp.children[0].type === 'text') {
+                  txt = tmp.children[0].data;
+                  if (txt) {
+                    txt = txt.replace(/\s+/g, '');
+                  }
+                }
+                if (!txt) {
+                  for (let k = 0; k < tmp.children.length; k++) {
+                    if (tmp.children[k].name === 'span') {
+                      txt = $(tmp.children[k]).text();
+                      break;
+                    }
+                  }
+                  if (!txt) {
+                    continue;
+                  }
+                }
+                if (txt.indexOf("第一章") !== -1 || txt.indexOf("第1章") !== -1 || txt.indexOf("序") !== -1 || txt.indexOf("楔子") !== -1 || txt.indexOf("前言") !== -1
+                    || txt.indexOf("第一卷") !== -1 || txt.indexOf("第1卷") !== -1 || txt.indexOf("第一回") !== -1 || txt.indexOf("第1回") !== -1 || txt.indexOf("第01章") !== -1
+                    || txt.indexOf("第001章") !== -1 || txt.indexOf("第0001章") !== -1) {
+                  start = true;
+                }
+                if (start) {
+                  if (href.startsWith("/chapter/")) {
+                    href = url.substring(0, url.indexOf("//") + 2) + url.substring(url.indexOf("//") + 2).substring(0, url.substring(url.indexOf("//") + 2).indexOf("/")) + href;
+                  } else if (href.startsWith("//")) {
+                    href = url.substring(0, url.indexOf("//")) + href;
+                  } else if (href.startsWith("http")) {
 
-                } else if (href.startsWith("/")) {
-                  let prefix = href.substring(0, href.lastIndexOf("/"));
-                  if (prefix) {
-                    if (url.indexOf(prefix)) {
-                      href = url.substring(0, url.lastIndexOf("/")) + href.substring(href.lastIndexOf("/"));
+                  } else if (href.startsWith("/")) {
+                    let prefix = href.substring(0, href.lastIndexOf("/"));
+                    if (prefix) {
+                      if (url.indexOf(prefix)) {
+                        href = url.substring(0, url.lastIndexOf("/")) + href.substring(href.lastIndexOf("/"));
+                      } else {
+                        href = url.substring(0, url.lastIndexOf("/")) + href;
+                      }
                     } else {
                       href = url.substring(0, url.lastIndexOf("/")) + href;
                     }
                   } else {
-                    href = url.substring(0, url.lastIndexOf("/")) + href;
+                    href = url.substring(0, url.lastIndexOf("/") + 1) + href;
                   }
-                } else {
-                  href = url.substring(0, url.lastIndexOf("/") + 1) + href;
+                  result.push(href);
                 }
-                result.push(href);
               }
+              return result;
+            } catch (e) {
+              console.log(e);
+              return null;
             }
-            return result;
           }
           let bookName = '';
           if (rule && rule.book_name) {
@@ -214,6 +238,7 @@ window.services = {
             if (!menu || menu.length <= 0) {
               callback(response);
             } else {
+              task.rule = rule;
               task.menu = menu;
               task.status = 0;
               task.statusText = '任务处理中';
@@ -235,7 +260,7 @@ window.services = {
     })
   },
   /*** 获取章节标题、章节内容并写入到临时文件 ***/
-  getChapter: (task, rule, callback) => {
+  getChapter: (task, callback) => {
     let response = {};
     response.err_no = 0;
     response.err_info = "保存成功";
@@ -265,12 +290,18 @@ window.services = {
           let getChapterTitle = function () {
             let result = '';
             let tmpTxt = '';
-            let nameReg = [ '*title', '*name', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'];
+            let nameReg = [ '.content-wrap', '*title', '*name', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'];
             for (let i = 0; i < nameReg.length; i++) {
               let tmp;
               if (nameReg[i].startsWith("*")) {
                 let attr = nameReg[i].replace("*", "");
-                tmp = $("[id*=" + attr + "]");
+                tmp = $("[id*=" + attr + "] h1");
+                if (tmp.length <= 0) {
+                  tmp = $("[class*=" + attr + "] h1");
+                }
+                if (tmp.length <= 0) {
+                  tmp = $("[id*=" + attr + "]");
+                }
                 if (tmp.length <= 0) {
                   tmp = $("[class*=" + attr + "]");
                 }
@@ -286,13 +317,15 @@ window.services = {
                   continue;
                 }
                 let txt = tmp1.children[0].data;
-                if (txt && txt.length >= 1 && txt.length <= 25) {
+                if (txt && txt.length >= 1 && txt.length <= 30) {
                   if(txt.indexOf('第') === -1){
                     tmpTxt = txt;
                     continue;
                   }
                   result = txt;
                   break;
+                } else if (txt && txt.length > 30 && txt.length <= 50) {
+                  tmpTxt = txt;
                 }
               }
               if (result) {
@@ -307,7 +340,7 @@ window.services = {
           let getChapterContent = function () {
             let result = '';
             let tmpTxt = '';
-            let contentReg = [ '.novel_content', '.box_box','.showtxt','.panel-body','.zw','*content','*text','*txt','*nr','*chapter','*cont','*article','*read' ];
+            let contentReg = [ '.read-content', '.novel_content', '.box_box','.showtxt','.panel-body','.zw','*content','*text','*txt','*nr','*chapter','*cont','*article','*read' ];
             for (let i = 0; i < contentReg.length; i++) {
               let tmp;
               if (contentReg[i].startsWith("*")) {
@@ -350,8 +383,8 @@ window.services = {
           }
           $ = cheerio.load(_html);
           let title = '';
-          if (rule && rule.chapter_title) {
-            title = $(rule.chapter_title).text();
+          if (task.rule && task.rule.chapter_title) {
+            title = $(task.rule.chapter_title).text();
             if (!title) {
               logs += '<p style="color: red"><span style="margin-right: 4px;padding: 1px 3px;border-radius: 2px;background: #cacaca45;">'+ new Date().format("yyyy-MM-dd hh:mm:ss")+'</span>获取章节标题失败，请检查您的json规则是否正确</p>';
               response.err_no = 2;
@@ -370,8 +403,8 @@ window.services = {
             callback(response);
           } else {
             let content = '';
-            if (rule && rule.chapter_content) {
-              content = $(rule.chapter_content).text();
+            if (task.rule && task.rule.chapter_content) {
+              content = $(task.rule.chapter_content).text();
               if (!content) {
                 logs += '<p style="color: red"><span style="margin-right: 4px;padding: 1px 3px;border-radius: 2px;background: #cacaca45;">'+ new Date().format("yyyy-MM-dd hh:mm:ss")+'</span>获取章节正文失败，请检查您的json规则是否正确</p>';
                 response.err_no = 3;
@@ -437,9 +470,9 @@ window.services = {
       fs.renameSync(tmpPath,newPath);
     } catch (e) {
       console.log(e);
-      return false;
+      return '保存出错,错误信息：' + e;
     }
-    return true;
+    return 'ok';
   },
   /***  清空临时目录中本插件的文件  ***/
   emptyTempDir: () => {
