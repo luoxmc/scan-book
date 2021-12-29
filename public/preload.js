@@ -503,17 +503,13 @@ window.services = {
     }
     //使用jschardet检查文件编码
     let encodingCheck = jschardet.detect(buf);
-    console.log(encodingCheck)
     //用检查出来的编码将buffer转成字符串
     if (encodingCheck.confidence >= 0.6) {
       return  iconv.decode(buf, encodingCheck.encoding);
     } else {
-      console.log(buf)
       let str =  iconv.decode(buf, 'utf-8');
-      console.log('utf-8:'+str);
       if (str.indexOf("�") !== -1) {
         str =  iconv.decode(buf, 'gbk');
-        console.log('gbk:'+str);
       }
       return str;
     }

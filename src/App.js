@@ -233,6 +233,23 @@ export default class App extends React.Component {
       }
     });
   }
+  /***  跳过当前章节  ***/
+  skipChapter = (e,task) => {
+    let self = this;
+    let state = self.state;
+    state.tasks.forEach((oneTask,idx) => {
+      if (oneTask.id === task.id) {
+        if(task.status === 4){
+          task.log += '<p style="color: #14bfdb"><span style="margin-right: 4px;padding: 1px 3px;border-radius: 2px;background: #cacaca45;">'+ new Date().format("yyyy-MM-dd hh:mm:ss")+'</span>已跳过地址为【'+ task.menu[task.curChapter] +'】的章节</p>';
+          task.curChapter ++;
+          state.tasks.splice(idx, 1, task);
+          self.setState( JSON.parse(JSON.stringify(state)), () => {
+            self.pauseTask(null, task);
+          });
+        }
+      }
+    });
+  }
   /***  保存文件或者删除任务  ***/
   saveTxt = (e,task) => {
     let self = this;
@@ -370,18 +387,18 @@ export default class App extends React.Component {
                 <Button  variant="contained" style={{width:'100%'}} onClick={this.addTask}>添加爬取任务</Button>
               </Grid>
             </Grid>
-            <Grid container spacing={2} style={{marginTop:'2rem'}}>
+            <Grid container spacing={4} style={{marginTop:'2rem'}}>
               {this.state.tasks.map((value) => (
-                  <Grid item xs={6} sm={4} >
+                  <Grid item xs={6} sm={6} >
                     <Card variant="outlined">
-                      <CardContent style={{padding:'7px 12px'}}>
+                      <CardContent style={{padding:'7px 14px'}}>
                         <Typography  color="textSecondary" gutterBottom>
                           {value.name}
                         </Typography>
                         <Typography variant="button" className={'book-status'+value.status}>
                           {value.statusText}
                         </Typography>
-                        <Box display="flex" alignItems="center" style={{margin:'0.5rem 0'}}>
+                        <Box display="flex" alignItems="center" style={{margin:'0.9rem 0'}}>
                           <Box width="100%" mr={1}>
                             <LinearProgress variant="determinate" value={value.progress} />
                           </Box>
@@ -394,6 +411,7 @@ export default class App extends React.Component {
                       <CardActions style={{padding:'4px 12px'}}>
                         <Button size="small" onClick={(e) => this.showLog(e,value)}>查看详情</Button>
                         <Button size="small" style={{display: value.status === 2 ? 'none':'inline-flex'}} color="primary" onClick={(e) => this.pauseTask(e,value)}>{pauseFlag[value.id] || value.status === 4 ? "恢复" : "暂停"}</Button>
+                        <Button size="small" style={{display: value.status !== 4 ? 'none':'inline-flex'}} color="primary" onClick={(e) => this.skipChapter(e,value)}>跳过此章</Button>
                         <Button size="small" style={{display: value.status === 0 ? 'none':'inline-flex'}} color={value.status === 2 ? "primary" : "secondary"} onClick={(e) => this.saveTxt(e,value)}>{value.status === 2 ? "保存" : "删除"}</Button>
                       </CardActions>
                     </Card>
@@ -438,16 +456,16 @@ export default class App extends React.Component {
                 <br/>
                 <pre>
                   <code>
-                    <p style={{margin:0}}>{"{"}</p>
-                    <p style={{margin:0,color:'#979798'}}>{"  //书名"}</p>
-                    <p style={{margin:0}}><span style={{color:'#f8c555'}}>  "book_name"</span>:<span style={{color:'#7ec699'}}> ".header h1"</span>,</p>
-                    <p style={{margin:0,color:'#979798'}}>{"  //章节目录列表，选择器定位到a标签"}</p>
-                    <p style={{margin:0}}><span style={{color:'#f8c555'}}>  "book_menu"</span>:<span style={{color:'#7ec699'}}> "#content ul li a"</span>,</p>
-                    <p style={{margin:0,color:'#979798'}}>{"  //每一个章节的标题"}</p>
-                    <p style={{margin:0}}><span style={{color:'#f8c555'}}>  "chapter_title"</span>:<span style={{color:'#7ec699'}}> "#title h1"</span>,</p>
-                    <p style={{margin:0,color:'#979798'}}>{"  //章节正文内容"}</p>
-                    <p style={{margin:0}}><span style={{color:'#f8c555'}}>  "chapter_content"</span>:<span style={{color:'#7ec699'}}> "#content"</span></p>
-                    <p style={{margin:0}}>{"}"}</p>
+                    <p style={{margin:0}}>{"  {"}</p>
+                    <p style={{margin:0,color:'#979798'}}>{"    //书名"}</p>
+                    <p style={{margin:0}}><span style={{color:'#f8c555'}}>    "book_name"</span>:<span style={{color:'#7ec699'}}> ".header h1"</span>,</p>
+                    <p style={{margin:0,color:'#979798'}}>{"    //章节目录列表，选择器定位到a标签"}</p>
+                    <p style={{margin:0}}><span style={{color:'#f8c555'}}>    "book_menu"</span>:<span style={{color:'#7ec699'}}> "#content ul li a"</span>,</p>
+                    <p style={{margin:0,color:'#979798'}}>{"    //每一个章节的标题"}</p>
+                    <p style={{margin:0}}><span style={{color:'#f8c555'}}>    "chapter_title"</span>:<span style={{color:'#7ec699'}}> "#title h1"</span>,</p>
+                    <p style={{margin:0,color:'#979798'}}>{"    //章节正文内容"}</p>
+                    <p style={{margin:0}}><span style={{color:'#f8c555'}}>    "chapter_content"</span>:<span style={{color:'#7ec699'}}> "#content"</span></p>
+                    <p style={{margin:0}}>{"  }"}</p>
                   </code>
                 </pre>
               </Typography>
