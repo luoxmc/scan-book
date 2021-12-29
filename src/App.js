@@ -172,6 +172,9 @@ export default class App extends React.Component {
           } else {
             task.status = 4;
             task.statusText = '任务处理中断';
+            if(pauseFlag[task.id]){
+              self.closeLoading();
+            }
           }
           if(task.status === 0 && pauseFlag[task.id]){
             task.status = 1;

@@ -34,7 +34,7 @@ window.services = {
     let task = {};
     task.id = new Date().getTime().toString();
     task.url = url;
-    request(url, {encoding: null,timeout:20000}, function (err, res, body) {
+    request(url, {encoding: null,timeout:15000}, function (err, res, body) {
       if (!err && res.statusCode === 200) {
         let _html = window.services.getOkText(body);
         if (!_html) {
@@ -127,7 +127,6 @@ window.services = {
                 if (tmp.length <= 5) {
                   continue;
                 }
-                console.log(tmp);
                 result = checkMenus(tmp);
                 if (result && result.length > 0) {
                   break;
@@ -276,7 +275,7 @@ window.services = {
     if (!window.services.checkFile(path)) {
       fs.createWriteStream(path);
     }
-    request(task.menu[task.curChapter], {encoding: null,timeout:20000}, function (err, res, body) {
+    request(task.menu[task.curChapter], {encoding: null,timeout:15000}, function (err, res, body) {
       let logs = '<p><span style="margin-right: 4px;padding: 1px 3px;border-radius: 2px;background: #cacaca45;">'+ new Date().format("yyyy-MM-dd hh:mm:ss")+'</span>开始解析url为【'+task.menu[task.curChapter]+'】的章节</p>';
       if (!err && res.statusCode === 200) {
         let _html = window.services.getOkText(body);
@@ -359,6 +358,14 @@ window.services = {
                 let tmp1 = tmp[j];
                 if (tmp1.children.length <= 1) {
                   continue;
+                }
+                let as = $(tmp1).find("a");
+                if(as && as.length > 0){
+                  as.each(function (idx,one) {
+                    if(one && $(one).text() && $(one).attr("href")){
+                      $(one).remove();
+                    }
+                  })
                 }
                 let txt = $(tmp1).text();
                 if(txt && txt.length < 150){
@@ -495,20 +502,20 @@ window.services = {
       return '';
     }
     //使用jschardet检查文件编码
-    let encodingCheck = {};
-    if (buf.byteLength > 8000) {
-      let tmpBuffer = new Buffer(8000);
-      buf.copy(tmpBuffer, 0, 0, 8000);
-      encodingCheck = jschardet.detect(tmpBuffer);
-      tmpBuffer = null;
-    } else {
-      encodingCheck = jschardet.detect(buf);
-    }
+    let encodingCheck = jschardet.detect(buf);
+    console.log(encodingCheck)
     //用检查出来的编码将buffer转成字符串
-    if (encodingCheck.confidence > 0.65) {
+    if (encodingCheck.confidence >= 0.6) {
       return  iconv.decode(buf, encodingCheck.encoding);
     } else {
-      return  iconv.decode(buf, 'utf-8');
+      console.log(buf)
+      let str =  iconv.decode(buf, 'utf-8');
+      console.log('utf-8:'+str);
+      if (str.indexOf("�") !== -1) {
+        str =  iconv.decode(buf, 'gbk');
+        console.log('gbk:'+str);
+      }
+      return str;
     }
   }
 }
