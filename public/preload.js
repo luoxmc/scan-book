@@ -27,14 +27,14 @@ Date.prototype.format = function(fmt) {
 
 window.services = {
   /*** 获取书籍书名以及章节列表 ***/
-  getTask: (url, time, rule, callback) => {
+  getTask: (url, time, rule, filter, callback) => {
     let response = {};
     response.err_no = 0;
     response.err_info = "调用成功";
     let task = {};
     task.id = new Date().getTime().toString();
     task.url = url;
-    request(url, {encoding: null,timeout:15000}, function (err, res, body) {
+    request(url, {encoding: null, gzip: true, headers: {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36'}, timeout:15000}, function (err, res, body) {
       if (!err && res.statusCode === 200) {
         let _html = window.services.getOkText(body);
         if (!_html) {
@@ -94,7 +94,7 @@ window.services = {
           let getBookMenu = function () {
             try {
               let result = [];
-              let menuReg = ['.volume-wrap ul li a', '.booklist span a', "#chapterlist p", '.ccss a', '.book-section a', '*menu', '*list', 'ul li a', 'dl dd a', 'tr td a'];
+              let menuReg = ['.volume-wrap ul li a', '#all_chapter a', '.booklist span a', "#chapterlist p", '.ccss a', '.book-section a', '*menu', '*list', 'ul li a', 'dl dd a', 'tr td a'];
               for (let i = 0; i < menuReg.length; i++) {
                 let tmp;
                 if (menuReg[i].startsWith("*")) {
@@ -168,7 +168,7 @@ window.services = {
                 }
                 if (txt.indexOf("第一章") !== -1 || txt.indexOf("第1章") !== -1 || txt.indexOf("序") !== -1 || txt.indexOf("楔子") !== -1 || txt.indexOf("前言") !== -1
                     || txt.indexOf("第一卷") !== -1 || txt.indexOf("第1卷") !== -1 || txt.indexOf("第一回") !== -1 || txt.indexOf("第1回") !== -1 || txt.indexOf("第01章") !== -1
-                    || txt.indexOf("第001章") !== -1 || txt.indexOf("第0001章") !== -1) {
+                    || txt.indexOf("0001") !== -1 || txt.indexOf("001") !== -1) {
                   start = true;
                 }
                 if (start) {
@@ -177,7 +177,7 @@ window.services = {
                   } else if (href.startsWith("//")) {
                     href = url.substring(0, url.indexOf("//")) + href;
                   } else if (href.startsWith("http")) {
-
+                    // do nothing
                   } else if (href.startsWith("/")) {
                     let prefix = href.substring(0, href.lastIndexOf("/"));
                     if (prefix) {
@@ -238,6 +238,7 @@ window.services = {
               callback(response);
             } else {
               task.rule = rule;
+              task.filter = filter;
               task.menu = menu;
               task.status = 0;
               task.statusText = '任务处理中';
@@ -251,9 +252,15 @@ window.services = {
           }
         }
       } else {
-        console.log(err);
+        let info = "访问书籍首页地址出错, ";
+        if (err){
+          console.log(err);
+          info += "错误信息:" + err ;
+        } else {
+          info += "请求状态码:" + res.statusCode ;
+        }
         response.err_no = 99;
-        response.err_info = '访问书籍首页地址出错，错误信息:' + err;
+        response.err_info = info;
         callback(response);
       }
     })
@@ -275,7 +282,7 @@ window.services = {
     if (!window.services.checkFile(path)) {
       fs.createWriteStream(path);
     }
-    request(task.menu[task.curChapter], {encoding: null,timeout:15000}, function (err, res, body) {
+    request(task.menu[task.curChapter], {encoding: null, gzip: true, headers: {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36'}, timeout:15000}, function (err, res, body) {
       let logs = '<p><span style="margin-right: 4px;padding: 1px 3px;border-radius: 2px;background: #cacaca45;">'+ new Date().format("yyyy-MM-dd hh:mm:ss")+'</span>开始解析url为【'+task.menu[task.curChapter]+'】的章节</p>';
       if (!err && res.statusCode === 200) {
         let _html = window.services.getOkText(body);
@@ -429,6 +436,14 @@ window.services = {
               response.log = logs;
               callback(response);
             } else {
+              if(task.filter && task.filter.length > 0){
+                task.filter.forEach( (one_filter) => {
+                  if(one_filter && typeof one_filter === 'string'){
+                    let reg = new RegExp( one_filter , "g" );
+                    content = content.replace(reg,'');
+                  }
+                })
+              }
               try {
                 let fd = fs.openSync(path ,'a');
                 fs.appendFileSync(fd,title+" \n");
@@ -448,8 +463,14 @@ window.services = {
           }
         }
       } else {
-        console.log(err);
-        logs += '<p style="color: red"><span style="margin-right: 4px;padding: 1px 3px;border-radius: 2px;background: #cacaca45;">'+ new Date().format("yyyy-MM-dd hh:mm:ss")+'</span>访问章节地址出错，错误信息:'+err+'</p>';
+        let info = "访问章节地址出错, ";
+        if (err){
+          console.log(err);
+          info += "错误信息:" + err ;
+        } else {
+          info += "请求状态码:" + res.statusCode ;
+        }
+        logs += '<p style="color: red"><span style="margin-right: 4px;padding: 1px 3px;border-radius: 2px;background: #cacaca45;">'+ new Date().format("yyyy-MM-dd hh:mm:ss")+'</span> '+info+' </p>';
         response.err_no = 99;
         response.err_info = '访问章节地址出错，错误信息:' + err;
         response.log = logs;

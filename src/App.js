@@ -63,6 +63,7 @@ export default class App extends React.Component {
     bookUrl: null,
     interval: null,
     rule: null,
+    filter: null,
     tasks: [],
     msg: {
       show: false,
@@ -111,6 +112,19 @@ export default class App extends React.Component {
         return;
       }
     }
+    let filter;
+    if(this.state.filter){
+      try {
+        filter = JSON.parse(this.state.filter);
+        if(!filter || filter.length <= 0){
+          this.showTip("过滤规则不正确，请检查规则json是否为数组格式");
+          return;
+        }
+      } catch (e) {
+        this.showTip("过滤规则格式不正确，请检查");
+        return;
+      }
+    }
     if(this.state.tasks){
       if(this.state.tasks.length >= 3){
         this.showTip("最多同时执行三个抓取任务，请稍后再试");
@@ -135,7 +149,7 @@ export default class App extends React.Component {
     } else if (this.state.tasks.length === 2 && Number(this.state.interval) > 400){
       interval = 400;
     }
-    window.services.getTask(this.state.bookUrl, interval ,rule,(res) => {
+    window.services.getTask(this.state.bookUrl, interval ,rule, filter, (res) => {
       if(res.err_no === 0){
         let tasks = self.state.tasks;
         tasks.unshift(res.result);
@@ -144,6 +158,7 @@ export default class App extends React.Component {
           self.state.bookUrl = '';
           self.state.rule = '';
           self.state.interval = '';
+          self.state.filter = '';
           self.getOneChapter(res.result);
         });
       } else {
@@ -382,6 +397,10 @@ export default class App extends React.Component {
               <TextField value={this.state.rule} id="rule" label="抓取规则" placeholder="选填,请输入该网站的抓取规则(json格式)" multiline fullWidth margin="normal"
                          maxRows={6} InputLabelProps={{shrink: true}} onChange={(e) => this.inputChange(e)}/>
             </Grid>
+            <Grid item xs={12} sm={12}>
+              <TextField value={this.state.filter} id="filter" label="过滤规则" placeholder="选填,请输入该网站的正文过滤规则(json格式)" multiline fullWidth margin="normal"
+                         maxRows={6} InputLabelProps={{shrink: true}} onChange={(e) => this.inputChange(e)}/>
+            </Grid>
             <Grid container xs={12} justifyContent="center" style={{paddingTop:'1rem'}}>
               <Grid item xs={4} sm={2} >
                 <Button  variant="contained" style={{width:'100%'}} onClick={this.addTask}>添加爬取任务</Button>
@@ -466,6 +485,27 @@ export default class App extends React.Component {
                     <p style={{margin:0,color:'#979798'}}>{"    //章节正文内容"}</p>
                     <p style={{margin:0}}><span style={{color:'#f8c555'}}>    "chapter_content"</span>:<span style={{color:'#7ec699'}}> "#content"</span></p>
                     <p style={{margin:0}}>{"  }"}</p>
+                  </code>
+                </pre>
+              </Typography>
+              <Typography gutterBottom>
+                <b style={{color:'#d25353'}}>过滤规则</b>
+                <br/>
+                &nbsp;&nbsp;&nbsp;&nbsp;这是一个非必填项，填写后，插件爬取章节正文时会过滤掉规则中的文字。
+                <br/>
+                <br/>
+                &nbsp;&nbsp;&nbsp;&nbsp;很多网站的章节正文中会加入一些烦人的广告文字，比如 "请记住本书首发域名：xxx.com"、"最新网址：yyy.com" 。 这些与小说无关的内容非常影响阅读体验，所以可以把这些文字添加到过滤规则中，爬取时会自动删除掉这些文字。
+                <br/>
+                <br/>
+                &nbsp;&nbsp;&nbsp;&nbsp;过滤规则示例如下：
+                <br/>
+                <pre>
+                  <code>
+                    <p style={{margin:0}}>{"  ["}</p>
+                    <p style={{margin:0}}><span style={{color:'#7ec699'}}>    "请记住本书首发域名：xxx.com"</span>,</p>
+                    <p style={{margin:0}}><span style={{color:'#7ec699'}}>    "最新网址：yyy.com"</span>,</p>
+                    <p style={{margin:0}}><span style={{color:'#7ec699'}}>    "加入书签"</span></p>
+                    <p style={{margin:0}}>{"  ]"}</p>
                   </code>
                 </pre>
               </Typography>
