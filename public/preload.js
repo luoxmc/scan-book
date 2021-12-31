@@ -296,7 +296,7 @@ window.services = {
           let getChapterTitle = function () {
             let result = '';
             let tmpTxt = '';
-            let nameReg = [ '.content-wrap', '*title', '*name', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'];
+            let nameReg = [ '.content-wrap', '*title', '*name', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'h1 span'];
             for (let i = 0; i < nameReg.length; i++) {
               let tmp;
               if (nameReg[i].startsWith("*")) {
@@ -322,7 +322,7 @@ window.services = {
                 if (tmp1.children.length !== 1) {
                   continue;
                 }
-                let txt = tmp1.children[0].data;
+                let txt = $(tmp1).text();
                 if (txt && txt.length >= 1 && txt.length <= 30) {
                   if(txt.indexOf('第') === -1){
                     tmpTxt = txt;
@@ -495,7 +495,12 @@ window.services = {
   /***  保存文件  ***/
   saveFile: (tmpPath,newPath) => {
     try {
-      fs.renameSync(tmpPath,newPath);
+      let readStream=fs.createReadStream(tmpPath);
+      let writeStream=fs.createWriteStream(newPath);
+      readStream.pipe(writeStream);
+      readStream.on('end',function(){
+        fs.unlinkSync(tmpPath);
+      });
     } catch (e) {
       console.log(e);
       return '保存出错,错误信息：' + e;
