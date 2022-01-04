@@ -172,23 +172,12 @@ window.services = {
                   start = true;
                 }
                 if (start) {
-                  if (href.startsWith("/chapter/")) {
-                    href = url.substring(0, url.indexOf("//") + 2) + url.substring(url.indexOf("//") + 2).substring(0, url.substring(url.indexOf("//") + 2).indexOf("/")) + href;
-                  } else if (href.startsWith("//")) {
+                  if (href.startsWith("//")) {
                     href = url.substring(0, url.indexOf("//")) + href;
                   } else if (href.startsWith("http")) {
                     // do nothing
                   } else if (href.startsWith("/")) {
-                    let prefix = href.substring(0, href.lastIndexOf("/"));
-                    if (prefix) {
-                      if (url.indexOf(prefix)) {
-                        href = url.substring(0, url.lastIndexOf("/")) + href.substring(href.lastIndexOf("/"));
-                      } else {
-                        href = url.substring(0, url.lastIndexOf("/")) + href;
-                      }
-                    } else {
-                      href = url.substring(0, url.lastIndexOf("/")) + href;
-                    }
+                    href = url.substring(0, url.indexOf("//") + 2) + url.substring(url.indexOf("//") + 2).substring(0, url.substring(url.indexOf("//") + 2).indexOf("/")) + href;
                   } else {
                     href = url.substring(0, url.lastIndexOf("/") + 1) + href;
                   }
@@ -296,7 +285,7 @@ window.services = {
           let getChapterTitle = function () {
             let result = '';
             let tmpTxt = '';
-            let nameReg = [ '.content-wrap', '*title', '*name', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'h1 span'];
+            let nameReg = [ '.readAreaBox h1', '.content-wrap', '*title', '*name', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'h1 span'];
             for (let i = 0; i < nameReg.length; i++) {
               let tmp;
               if (nameReg[i].startsWith("*")) {
@@ -346,12 +335,18 @@ window.services = {
           let getChapterContent = function () {
             let result = '';
             let tmpTxt = '';
-            let contentReg = [ '.read-content', '.novel_content', '.box_box','.showtxt','.panel-body','.zw','*content','*text','*txt','*nr','*chapter','*cont','*article','*read' ];
+            let contentReg = [ '.read-content', '#ChapterBody', '.readAreaBox .p' , '.novel_content', '.box_box','.showtxt','.panel-body','.zw','*content','*text','*txt','*nr','*chapter','*cont','*article','*read' ];
             for (let i = 0; i < contentReg.length; i++) {
               let tmp;
               if (contentReg[i].startsWith("*")) {
                 let attr = contentReg[i].replace("*", "");
-                tmp = $("[id*=" + attr + "]");
+                tmp = $("div[id*=" + attr + "]");
+                if (tmp.length <= 0) {
+                  tmp = $("div[class*=" + attr + "]");
+                }
+                if (tmp.length <= 0) {
+                  tmp = $("[id*=" + attr + "]");
+                }
                 if (tmp.length <= 0) {
                   tmp = $("[class*=" + attr + "]");
                 }
@@ -522,6 +517,20 @@ window.services = {
     }
     return true;
   },
+  /***  根据任务id删除临时文件  ***/
+  deleteTemp: (id) => {
+    try {
+      let separator = window.platform.isWindows ? "\u005C" : "/";
+      let path = window.utools.getPath("temp") + separator + "scan-book" + separator + id + ".txt" ;
+      if (window.services.checkFile(path)) {
+        fs.unlinkSync(path);
+      }
+    } catch (e) {
+      console.log(e);
+      return false;
+    }
+    return true;
+  },
   /***  将buffer转成格式正常的字符串  ***/
   getOkText: (buf) => {
     if(!buf || buf.length <= 0){
@@ -534,8 +543,12 @@ window.services = {
       return  iconv.decode(buf, encodingCheck.encoding);
     } else {
       let str =  iconv.decode(buf, 'utf-8');
-      if (str.indexOf("�") !== -1) {
-        str =  iconv.decode(buf, 'gbk');
+      let idx = str.indexOf("�");
+      if (idx !== -1) {
+        idx = str.indexOf("�", idx + 1);
+        if (idx !== -1) {
+          str =  iconv.decode(buf, 'gbk');
+        }
       }
       return str;
     }

@@ -216,6 +216,42 @@ export default class App extends React.Component {
                   setTimeout(() => {
                     self.getOneChapter(task);
                   },task.interval);
+                } else {
+                  const resDb = window.utools.db.get(window.utools.getNativeId() + "/tasks");
+                  let tasks = resDb.data;
+                  //暂停、中断、成功状态，均需要更新数据库
+                  if (task.status === 1 || task.status === 4) {
+                    let compressTask = self.compressTask(task);
+                    let findIt = false;
+                    if(tasks && tasks.length > 0){
+                      for (let i = 0; i < tasks.length; i++ ) {
+                        let ele = tasks[i];
+                        if(ele && ele.id === task.id){
+                          //数据库有数据，更新之
+                          findIt = true;
+                          tasks.splice(i, 1, compressTask);
+                          break;
+                        }
+                      }
+                    }
+                    if(!findIt){
+                      //数据库无数据，添加之
+                      tasks.unshift(compressTask);
+                    }
+                  } else if (task.status === 2) {
+                    if(tasks && tasks.length > 0){
+                      for (let i = 0; i < tasks.length; i++ ) {
+                        let ele = tasks[i];
+                        if(ele && ele.id === task.id){
+                          //数据库有数据，删除之
+                          tasks.splice(i, 1);
+                          break;
+                        }
+                      }
+                    }
+                  }
+                  resDb.data = tasks;
+                  window.utools.db.put(resDb);
                 }
               });
             }
@@ -292,13 +328,43 @@ export default class App extends React.Component {
       for (let i = 0; i < state.tasks.length; i++) {
         let oneTask = state.tasks[i];
         if (oneTask.id === task.id) {
+          const resDb = window.utools.db.get(window.utools.getNativeId() + "/tasks");
+          let tasks = resDb.data;
+          //删除需要更新数据库
+          if(tasks && tasks.length > 0){
+            for (let j = 0; j < tasks.length; j++ ) {
+              let ele = tasks[j];
+              if(ele && ele.id === task.id){
+                //数据库有数据，删除之
+                tasks.splice(j, 1);
+                resDb.data = tasks;
+                window.utools.db.put(resDb);
+                break;
+              }
+            }
+          }
           state.tasks.splice(i,1);
+          window.services.deleteTemp(task.id);
           self.showTip("删除成功");
           break;
         }
       }
     }
     self.setState( JSON.parse(JSON.stringify(state)));
+  }
+  /***  截取任务的日志以减小体积（utools数据库最大只能存一兆的文档）  ***/
+  compressTask = (task) => {
+    if(!task || !task.log){
+      return task;
+    }
+    let log = task.log;
+    if(log.length > 5000){
+      log = log.substring(log.length - 1500);
+      log = log.substring(log.indexOf("<p><span"));
+      log = "<p style='text-align: center'>部分历史日志已省略....</p>" + log;
+      task.log = log;
+    }
+    return task;
   }
   /***  输入框change事件  ***/
   inputChange = (e) => {
@@ -370,7 +436,28 @@ export default class App extends React.Component {
 
     })
     window.utools.onPluginReady(() => {
-      window.services.emptyTempDir();
+      //查询持久化的任务信息
+      const res = window.utools.db.get(window.utools.getNativeId() + "/tasks");
+      console.log(res);
+      if(res){
+        let tasks = res.data;
+        if(tasks && tasks.length > 0){
+          tasks.forEach((ele) => {
+            if(ele && ele.status === 1){
+              pauseFlag[ele.id] = true;
+            }
+          });
+          this.setState({tasks: JSON.parse(JSON.stringify(tasks))});
+        } else {
+          window.services.emptyTempDir();
+        }
+      } else {
+        let data = {
+          _id : window.utools.getNativeId() + "/tasks",
+          data : []
+        }
+        window.utools.db.put(data);
+      }
     })
     window.utools.onPluginOut(() => {
 
