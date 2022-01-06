@@ -339,8 +339,10 @@ window.services = {
                 }
                 let txt = $(tmp1).text();
                 if (txt && txt.length >= 1 && txt.length <= 33) {
-                  if(txt.indexOf('第') === -1 && !tmpTxt){
-                    tmpTxt = txt;
+                  if(txt.indexOf('第') === -1 ){
+                    if(!tmpTxt){
+                      tmpTxt = txt;
+                    }
                     continue;
                   }
                   result = txt;
@@ -378,6 +380,7 @@ window.services = {
                   let resultCont = await getDynamicContent(href);
                   if(resultCont){
                     resultCont = resultCont.substring(0,resultCont.length-3).replace("callback({content:'","");
+                    resultCont = resultCont.replace(/<\/p>/g,"</p>\n").replace(/<br\s*\/?>/g,"\n");
                     result = $(resultCont).text();
                   }
                 }
@@ -423,9 +426,8 @@ window.services = {
                       continue;
                     }
                     if (txt) {
-                      let reg = /(正文)?(第)([零〇一二三四五六七八九十百千万a-zA-Z0-9]{1,7})[章节卷集部篇回]((?! {4}).)((?!\t{1,4}).){0,30}\r?\n/g;
-                      txt = txt.replace(reg,'').replace(/\s/g, "");
-                      result = txt;
+                      let tmpHtml = $(tmp1).html().replace(/<\/p>/g,"</p>\n").replace(/<br\s*\/?>/g,"\n");
+                      result = $(tmpHtml).text();
                       break;
                     }
                   }
@@ -435,6 +437,10 @@ window.services = {
                 }
                 if(!result && tmpTxt){
                   result = tmpTxt;
+                }
+                if (result) {
+                  let reg = /(正文)?(第)([零〇一二三四五六七八九十百千万a-zA-Z0-9]{1,7})[章节卷集部篇回]((?! {4}).)((?!\t{1,4}).){0,30}\r?\n/g;
+                  result = result.replace(reg,'').replace(/\n{2,}/g,"\n").replace(/\n+\s*\n+/g,"\n");
                 }
               }
               resolve(result);
