@@ -3,6 +3,7 @@ const request = require("request");
 const iconv = require('iconv-lite');
 const jschardet = require("jschardet");
 const fs = require("fs");
+const url = require("url");
 
 Date.prototype.format = function(fmt) {
   let o = {
@@ -25,16 +26,28 @@ Date.prototype.format = function(fmt) {
   return fmt;
 }
 
+let defaultHeaders = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36'};
+
 window.services = {
   /*** 获取书籍书名以及章节列表 ***/
-  getTask: (url, time, rule, filter, callback) => {
+  getTask: (url, time, startChapter, headers, rule, filter, callback) => {
     let response = {};
     response.err_no = 0;
     response.err_info = "调用成功";
     let task = {};
     task.id = new Date().getTime().toString();
     task.url = url;
-    request(url, {encoding: null, gzip: true, headers: {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36'}, timeout:15000}, function (err, res, body) {
+    if (!headers){
+      headers = {};
+    }
+    if (!headers['User-Agent']) {
+      headers['User-Agent'] = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36';
+    }
+    if (!headers['Connection']) {
+      headers['Connection'] = 'keep-alive';
+    }
+    console.log(headers);
+    request(url, {encoding: null, gzip: true, headers: headers, timeout:15000}, function (err, res, body) {
       if (!err && res.statusCode === 200) {
         let _html = window.services.getOkText(body);
         if (!_html) {
@@ -46,7 +59,7 @@ window.services = {
           let getBookName = function () {
             try {
               let result = '';
-              let nameReg = ['.book-info h1 em', '.pt-name a', '.title span', '.f20h', '.caption p', "*title", "*name", 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'h3 a'];
+              let nameReg = ['.book-info h1 em', '.pt-name a', '.bookNm a' , '.title span', '.f20h', '.caption p', "*title", "*name", 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'h3 a'];
               for (let i = 0; i < nameReg.length; i++) {
                 let tmp;
                 if (nameReg[i].startsWith("*")) {
@@ -94,37 +107,37 @@ window.services = {
           let getBookMenu = function () {
             try {
               let result = [];
-              let menuReg = ['.volume-wrap ul li a', '#all_chapter a', '.booklist span a', "#chapterlist p", '.ccss a', '.book-section a', '*menu', '*list', 'ul li a', 'dl dd a', 'tr td a'];
+              let menuReg = ['.volume-wrap ul li a', '#all_chapter a' , '.boxT .lfT li a' , '.booklist span a', "#chapterlist p", '.ccss a', '.book-section a', ".book_con ul li a" ,  '*chapter', '*menu', '*list', 'ul li a', 'dl dd a', 'tr td a'];
               for (let i = 0; i < menuReg.length; i++) {
                 let tmp;
                 if (menuReg[i].startsWith("*")) {
                   let attr = menuReg[i].replace("*", "");
                   tmp = $("[id*=" + attr + "] ul li a");
-                  if (tmp.length <= 5) {
+                  if (tmp.length <= 10) {
                     tmp = $("[class*=" + attr + "] ul li a");
                   }
-                  if (tmp.length <= 5) {
+                  if (tmp.length <= 10) {
                     tmp = $("[id*=" + attr + "] dl dd a");
                   }
-                  if (tmp.length <= 5) {
+                  if (tmp.length <= 10) {
                     tmp = $("[class*=" + attr + "] dl dd a");
                   }
-                  if (tmp.length <= 5) {
+                  if (tmp.length <= 10) {
                     tmp = $("[id*=" + attr + "] tr td a");
                   }
-                  if (tmp.length <= 5) {
+                  if (tmp.length <= 10) {
                     tmp = $("[class*=" + attr + "] tr td a");
                   }
-                  if (tmp.length <= 5) {
+                  if (tmp.length <= 10) {
                     tmp = $("[id*=" + attr + "] a");
                   }
-                  if (tmp.length <= 5) {
+                  if (tmp.length <= 10) {
                     tmp = $("[class*=" + attr + "] a");
                   }
                 } else {
                   tmp = $(menuReg[i]);
                 }
-                if (tmp.length <= 5) {
+                if (tmp.length <= 10) {
                   continue;
                 }
                 result = checkMenus(tmp);
@@ -142,6 +155,7 @@ window.services = {
             try {
               let result = [];
               let start = false;
+              let startChapterExit = false;
               for (let j = 0; j < $ele.length; j++) {
                 let tmp = $ele[j];
                 let href = tmp.attribs.href;
@@ -166,9 +180,13 @@ window.services = {
                     continue;
                   }
                 }
-                if (txt.indexOf("第一章") !== -1 || txt.indexOf("第1章") !== -1 || txt.indexOf("序") !== -1 || txt.indexOf("楔子") !== -1 || txt.indexOf("前言") !== -1
+                if ( startChapter && txt.indexOf(startChapter) !== -1) {
+                  //指定了开始章节则按定义的开始章节开始抓取
+                  start = true;
+                  startChapterExit = true;
+                } else if (!startChapter && (txt.indexOf("第一章") !== -1 || txt.indexOf("第1章") !== -1 || txt.indexOf("序") !== -1 || txt.indexOf("楔子") !== -1 || txt.indexOf("前言") !== -1
                     || txt.indexOf("第一卷") !== -1 || txt.indexOf("第1卷") !== -1 || txt.indexOf("第一回") !== -1 || txt.indexOf("第1回") !== -1 || txt.indexOf("第01章") !== -1
-                    || txt.indexOf("0001") !== -1 || txt.indexOf("001") !== -1) {
+                    || txt.indexOf("第一页") !== -1 || txt.indexOf("第1页") !== -1 || txt.indexOf("0001") !== -1 || txt.indexOf("001") !== -1) ) {
                   start = true;
                 }
                 if (start) {
@@ -184,10 +202,13 @@ window.services = {
                   result.push(href);
                 }
               }
+              if (startChapter && !startChapterExit) {
+                return '未找到您定义的开始章节';
+              }
               return result;
             } catch (e) {
               console.log(e);
-              return null;
+              return '获取章节列表失败,错误信息:' + e;
             }
           }
           let bookName = '';
@@ -208,26 +229,31 @@ window.services = {
             callback(response);
           } else {
             task.name = bookName;
-            let menu = [];
+            let menu ;
             if (rule && rule.book_menu) {
               let tmp = $(rule.book_menu);
               menu = checkMenus(tmp);
               if (!menu || menu.length <= 0) {
-                response.err_no = 3;
+                response.err_no = 5;
                 response.err_info = '获取章节列表失败，请检查您的json规则是否正确';
               }
             } else {
               menu = getBookMenu();
               if (!menu || menu.length <= 0) {
-                response.err_no = 4;
+                response.err_no = 6;
                 response.err_info = '智能解析章节列表失败，可能暂未支持该网站';
               }
             }
-            if (!menu || menu.length <= 0) {
+            if (typeof menu === 'string') {
+              response.err_no = 4;
+              response.err_info = menu;
+              callback(response);
+            } else if (!menu || menu.length <= 0) {
               callback(response);
             } else {
               task.rule = rule;
               task.filter = filter;
+              task.headers = headers;
               task.menu = menu;
               task.status = 0;
               task.statusText = '任务处理中';
@@ -271,7 +297,7 @@ window.services = {
     if (!window.services.checkFile(path)) {
       fs.createWriteStream(path);
     }
-    request(task.menu[task.curChapter], {encoding: null, gzip: true, headers: {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36'}, timeout:15000}, function (err, res, body) {
+    request(task.menu[task.curChapter], {encoding: null, gzip: true, headers: task.headers, timeout:15000}, async function (err, res, body) {
       let logs = '<p><span style="margin-right: 4px;padding: 1px 3px;border-radius: 2px;background: #cacaca45;">'+ new Date().format("yyyy-MM-dd hh:mm:ss")+'</span>开始解析url为【'+task.menu[task.curChapter]+'】的章节</p>';
       if (!err && res.statusCode === 200) {
         let _html = window.services.getOkText(body);
@@ -285,7 +311,7 @@ window.services = {
           let getChapterTitle = function () {
             let result = '';
             let tmpTxt = '';
-            let nameReg = [ '.readAreaBox h1', '.content-wrap', '*title', '*name', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'h1 span'];
+            let nameReg = [ '.readAreaBox h1', '.content-wrap', '.art_tit', '*title', '*name', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'h1 span'];
             for (let i = 0; i < nameReg.length; i++) {
               let tmp;
               if (nameReg[i].startsWith("*")) {
@@ -312,14 +338,14 @@ window.services = {
                   continue;
                 }
                 let txt = $(tmp1).text();
-                if (txt && txt.length >= 1 && txt.length <= 30) {
-                  if(txt.indexOf('第') === -1){
+                if (txt && txt.length >= 1 && txt.length <= 33) {
+                  if(txt.indexOf('第') === -1 && !tmpTxt){
                     tmpTxt = txt;
                     continue;
                   }
                   result = txt;
                   break;
-                } else if (txt && txt.length > 30 && txt.length <= 50) {
+                } else if (txt && txt.length > 33 && txt.length <= 53) {
                   tmpTxt = txt;
                 }
               }
@@ -333,62 +359,86 @@ window.services = {
             return result;
           }
           let getChapterContent = function () {
-            let result = '';
-            let tmpTxt = '';
-            let contentReg = [ '.read-content', '#ChapterBody', '.readAreaBox .p' , '.novel_content', '.box_box','.showtxt','.panel-body','.zw','*content','*text','*txt','*nr','*chapter','*cont','*article','*read' ];
-            for (let i = 0; i < contentReg.length; i++) {
-              let tmp;
-              if (contentReg[i].startsWith("*")) {
-                let attr = contentReg[i].replace("*", "");
-                tmp = $("div[id*=" + attr + "]");
-                if (tmp.length <= 0) {
-                  tmp = $("div[class*=" + attr + "]");
-                }
-                if (tmp.length <= 0) {
-                  tmp = $("[id*=" + attr + "]");
-                }
-                if (tmp.length <= 0) {
-                  tmp = $("[class*=" + attr + "]");
+            return new Promise(async (resolve) => {
+              let getDynamicContent = function (href){
+                return new Promise((resolve1) => {
+                  request( href, {encoding: null, gzip: true, headers: task.headers, timeout:15000}, function (err, res, body) {
+                    if (!err && res.statusCode === 200) {
+                      resolve1(window.services.getOkText(body));
+                    } else {
+                      resolve1(null);
+                    }
+                  });
+                });
+              }
+              let result = '';
+              if (task.url.indexOf("tadu.com") !== -1) {
+                let href = $("#bookPartResourceUrl").val();
+                if(href){
+                  let resultCont = await getDynamicContent(href);
+                  if(resultCont){
+                    resultCont = resultCont.substring(0,resultCont.length-3).replace("callback({content:'","");
+                    result = $(resultCont).text();
+                  }
                 }
               } else {
-                tmp = $(contentReg[i]);
-              }
-              if (tmp.length <= 0) {
-                continue;
-              }
-              for (let j = 0; j < tmp.length; j++) {
-                let tmp1 = tmp[j];
-                if (tmp1.children.length <= 1) {
-                  continue;
-                }
-                let as = $(tmp1).find("a");
-                if(as && as.length > 0){
-                  as.each(function (idx,one) {
-                    if(one && $(one).text() && $(one).attr("href")){
-                      $(one).remove();
+                let tmpTxt = '';
+                let contentReg = [ '.read-content', '#ChapterBody', '.readAreaBox .p' , '.novel_content', '.box_box', '.showtxt','.panel-body', '.main_content .book_con' , '.zw','*content','*text','*txt','*nr','*chapter','*cont','*article','*read' ];
+                for (let i = 0; i < contentReg.length; i++) {
+                  let tmp;
+                  if (contentReg[i].startsWith("*")) {
+                    let attr = contentReg[i].replace("*", "");
+                    tmp = $("div[id*=" + attr + "]");
+                    if (tmp.length <= 0) {
+                      tmp = $("div[class*=" + attr + "]");
                     }
-                  })
+                    if (tmp.length <= 0) {
+                      tmp = $("[id*=" + attr + "]");
+                    }
+                    if (tmp.length <= 0) {
+                      tmp = $("[class*=" + attr + "]");
+                    }
+                  } else {
+                    tmp = $(contentReg[i]);
+                  }
+                  if (tmp.length <= 0) {
+                    continue;
+                  }
+                  for (let j = 0; j < tmp.length; j++) {
+                    let tmp1 = tmp[j];
+                    if (tmp1.children.length <= 1) {
+                      continue;
+                    }
+                    let as = $(tmp1).find("a");
+                    if(as && as.length > 0){
+                      as.each(function (idx,one) {
+                        if(one && $(one).text() && $(one).attr("href")){
+                          $(one).remove();
+                        }
+                      })
+                    }
+                    let txt = $(tmp1).text();
+                    if(txt && txt.length < 150){
+                      tmpTxt = txt;
+                      continue;
+                    }
+                    if (txt) {
+                      let reg = /(正文)?(第)([零〇一二三四五六七八九十百千万a-zA-Z0-9]{1,7})[章节卷集部篇回]((?! {4}).)((?!\t{1,4}).){0,30}\r?\n/g;
+                      txt = txt.replace(reg,'').replace(/\s/g, "");
+                      result = txt;
+                      break;
+                    }
+                  }
+                  if (result) {
+                    break;
+                  }
                 }
-                let txt = $(tmp1).text();
-                if(txt && txt.length < 150){
-                  tmpTxt = txt;
-                  continue;
-                }
-                if (txt) {
-                  let reg = /(正文)?(第)([零〇一二三四五六七八九十百千万a-zA-Z0-9]{1,7})[章节卷集部篇回]((?! {4}).)((?!\t{1,4}).){0,30}\r?\n/g;
-                  txt = txt.replace(reg,'').replace(/\s/g, "");
-                  result = txt;
-                  break;
+                if(!result && tmpTxt){
+                  result = tmpTxt;
                 }
               }
-              if (result) {
-                break;
-              }
-            }
-            if(!result && tmpTxt){
-              result = tmpTxt;
-            }
-            return result;
+              resolve(result);
+            });
           }
           $ = cheerio.load(_html);
           let title = '';
@@ -420,7 +470,7 @@ window.services = {
                 response.err_info = '获取章节正文失败，请检查您的json规则是否正确';
               }
             } else {
-              content = getChapterContent();
+              content = await getChapterContent();
               if (!content) {
                 logs += '<p style="color: red"><span style="margin-right: 4px;padding: 1px 3px;border-radius: 2px;background: #cacaca45;">'+ new Date().format("yyyy-MM-dd hh:mm:ss")+'</span>智能解析章节正文失败，可能暂未支持该网站</p>';
                 response.err_no = 4;

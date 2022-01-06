@@ -62,6 +62,8 @@ export default class App extends React.Component {
     theme: window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light',
     bookUrl: null,
     interval: null,
+    startChapter: null,
+    headers: null,
     rule: null,
     filter: null,
     tasks: [],
@@ -101,27 +103,36 @@ export default class App extends React.Component {
     }
     let rule ;
     if(this.state.rule){
-      try {
+      if (this.isJSON(this.state.rule)) {
         rule = JSON.parse(this.state.rule);
         if(!rule.book_menu || !rule.book_name || !rule.chapter_title || !rule.chapter_content){
-          this.showTip("爬书规则不正确，请检查规则四要素是否都有配置");
+          this.showTip("抓取规则不正确，请检查规则四要素是否都有配置");
           return;
         }
-      } catch (e) {
-        this.showTip("爬书规则格式不正确，请检查");
+      } else {
+        this.showTip("抓取规则格式不正确，请检查");
         return;
       }
     }
     let filter;
     if(this.state.filter){
-      try {
+      if (this.isJSON(this.state.filter)) {
         filter = JSON.parse(this.state.filter);
         if(!filter || filter.length <= 0){
           this.showTip("过滤规则不正确，请检查规则json是否为数组格式");
           return;
         }
-      } catch (e) {
+      } else {
         this.showTip("过滤规则格式不正确，请检查");
+        return;
+      }
+    }
+    let headers;
+    if(this.state.headers){
+      if (this.isJSON(this.state.headers)) {
+        headers = JSON.parse(this.state.headers);
+      } else {
+        this.showTip("header参数格式不正确，请检查");
         return;
       }
     }
@@ -149,7 +160,7 @@ export default class App extends React.Component {
     } else if (this.state.tasks.length === 2 && Number(this.state.interval) > 400){
       interval = 400;
     }
-    window.services.getTask(this.state.bookUrl, interval ,rule, filter, (res) => {
+    window.services.getTask(this.state.bookUrl, interval, this.state.startChapter, headers ,rule, filter, (res) => {
       if(res.err_no === 0){
         let tasks = self.state.tasks;
         tasks.unshift(res.result);
@@ -159,6 +170,8 @@ export default class App extends React.Component {
           self.state.rule = '';
           self.state.interval = '';
           self.state.filter = '';
+          self.state.startChapter = '';
+          self.state.headers = '';
           self.getOneChapter(res.result);
         });
       } else {
@@ -220,7 +233,7 @@ export default class App extends React.Component {
                   const resDb = window.utools.db.get(window.utools.getNativeId() + "/tasks");
                   let tasks = resDb.data;
                   //暂停、中断、成功状态，均需要更新数据库
-                  if (task.status === 1 || task.status === 4) {
+                  if (task.status === 1 || task.status === 4 || task.status === 2) {
                     let compressTask = self.compressTask(task);
                     let findIt = false;
                     if(tasks && tasks.length > 0){
@@ -237,17 +250,6 @@ export default class App extends React.Component {
                     if(!findIt){
                       //数据库无数据，添加之
                       tasks.unshift(compressTask);
-                    }
-                  } else if (task.status === 2) {
-                    if(tasks && tasks.length > 0){
-                      for (let i = 0; i < tasks.length; i++ ) {
-                        let ele = tasks[i];
-                        if(ele && ele.id === task.id){
-                          //数据库有数据，删除之
-                          tasks.splice(i, 1);
-                          break;
-                        }
-                      }
                     }
                   }
                   resDb.data = tasks;
@@ -328,24 +330,24 @@ export default class App extends React.Component {
       for (let i = 0; i < state.tasks.length; i++) {
         let oneTask = state.tasks[i];
         if (oneTask.id === task.id) {
-          const resDb = window.utools.db.get(window.utools.getNativeId() + "/tasks");
-          let tasks = resDb.data;
-          //删除需要更新数据库
-          if(tasks && tasks.length > 0){
-            for (let j = 0; j < tasks.length; j++ ) {
-              let ele = tasks[j];
-              if(ele && ele.id === task.id){
-                //数据库有数据，删除之
-                tasks.splice(j, 1);
-                resDb.data = tasks;
-                window.utools.db.put(resDb);
-                break;
-              }
-            }
-          }
           state.tasks.splice(i,1);
           window.services.deleteTemp(task.id);
           self.showTip("删除成功");
+          break;
+        }
+      }
+    }
+    const resDb = window.utools.db.get(window.utools.getNativeId() + "/tasks");
+    let tasks = resDb.data;
+    //保存或删除需要更新数据库
+    if(tasks && tasks.length > 0){
+      for (let j = 0; j < tasks.length; j++ ) {
+        let ele = tasks[j];
+        if(ele && ele.id === task.id){
+          //数据库有数据，删除之
+          tasks.splice(j, 1);
+          resDb.data = tasks;
+          window.utools.db.put(resDb);
           break;
         }
       }
@@ -359,7 +361,7 @@ export default class App extends React.Component {
     }
     let log = task.log;
     if(log.length > 5000){
-      log = log.substring(log.length - 1500);
+      log = log.substring(log.length - 2000);
       log = log.substring(log.indexOf("<p><span"));
       log = "<p style='text-align: center'>部分历史日志已省略....</p>" + log;
       task.log = log;
@@ -404,7 +406,6 @@ export default class App extends React.Component {
     } else if (scrollHeight - scrollTop > clientHeight + 130) {
       scrollFlag = false;
     }
-
   }
   showLog = (e,task) => {
     let self = this;
@@ -428,6 +429,21 @@ export default class App extends React.Component {
   }
   closeHelp = (e) => {
     this.setState({showHelp : false});
+  }
+  /****   判断是否为json字符串  ****/
+  isJSON = (str) => {
+    if (typeof str == 'string') {
+      try {
+        let obj = JSON.parse(str);
+        return !!(typeof obj === 'object' && obj);
+      } catch(e) {
+        console.log('error：' + str + '!!!' + e);
+        return false;
+      }
+    } else {
+      console.log('It is not a string!');
+      return false;
+    }
   }
 
 
@@ -478,6 +494,14 @@ export default class App extends React.Component {
             </Grid>
             <Grid item xs={12} sm={6} style={{paddingLeft:'0.8rem'}}>
               <TextField value={this.state.interval} id="interval" label="间隔时间" placeholder="请输入爬取每章内容的间隔时间(毫秒)" fullWidth margin="normal"
+                         InputLabelProps={{shrink: true}} onChange={(e) => this.inputChange(e)}/>
+            </Grid>
+            <Grid item xs={12} sm={6} style={{paddingRight:'0.8rem'}}>
+              <TextField value={this.state.startChapter} id="startChapter" label="开始章节" placeholder="选填,请输入需要指定的开始爬取章节的名称" fullWidth margin="normal"
+                         InputLabelProps={{shrink: true}} onChange={(e) => this.inputChange(e)}/>
+            </Grid>
+            <Grid item xs={12} sm={6} style={{paddingLeft:'0.8rem'}}>
+              <TextField value={this.state.headers} id="headers" label="header参数" placeholder="选填,发送请求的header参数(json格式)" fullWidth margin="normal"
                          InputLabelProps={{shrink: true}} onChange={(e) => this.inputChange(e)}/>
             </Grid>
             <Grid item xs={12} sm={12}>
@@ -537,7 +561,7 @@ export default class App extends React.Component {
               <Typography gutterBottom>
                 <b style={{color:'#d25353'}}>插件介绍</b>
                 <br/>
-                &nbsp;&nbsp;&nbsp;&nbsp;自动爬取小说网站上的内容，生成txt文件保存到本地。 ps：可以用utools插件市场的另一款插件《摸鱼阅读》来阅读txt格式的小说哦。
+                &nbsp;&nbsp;&nbsp;&nbsp;自动爬取小说网站上的内容，生成txt文件保存到本地。 ps：使用utools插件市场的另一款插件《摸鱼阅读》来阅读txt格式的小说体验更佳哦。
               </Typography>
               <Typography gutterBottom>
                 <b style={{color:'#d25353'}}>书籍主页地址</b>
@@ -550,13 +574,34 @@ export default class App extends React.Component {
                 &nbsp;&nbsp;&nbsp;&nbsp;大部分的网站为了防止被攻击，都会设置拦截器防止连续请求，所以设置一个爬取间隔时间是非常有必要的。单位为毫秒，最小值为200毫秒。
               </Typography>
               <Typography gutterBottom>
+                <b style={{color:'#d25353'}}>开始章节</b>
+                <br/>
+                &nbsp;&nbsp;&nbsp;&nbsp;这是一个非必填项，插件默认是从第一章开始爬取。但是如果之前的章节你已经看过了，只需要从特定的章节开始爬取，那么在此项填入你需要的开始章节的名称即可。 比如 "第十一章 少女和飞剑" ，或者 "少女和飞剑"
+              </Typography>
+              <Typography gutterBottom>
+                <b style={{color:'#d25353'}}>header参数</b>
+                <br/>
+                &nbsp;&nbsp;&nbsp;&nbsp;这是一个非必填项，主要用于保存登陆状态，以爬取一些你已经购买过的收费网站的收费章节。
+                <br/>
+                &nbsp;&nbsp;&nbsp;&nbsp;基本上所有收费网站的收费章节，未登录或购买的情况下都只展示开头的几十个字，登陆并且购买之后才能正常阅读。 header参数就是为了保存你的登陆状态的，大部分网站的登陆状态是通过cookie来保存，所以你可以在header参数里面配置上你登陆之后的cookie，以正常爬取已购买章节。
+                <br/>
+                &nbsp;&nbsp;&nbsp;&nbsp;header参数示例如下：
+                <br/>
+                <pre>
+                  <code>
+                    <p style={{margin:0}}>{"  {"}</p>
+                    <p style={{margin:0}}><span style={{color:'#f8c555'}}>    "cookie"</span>:<span style={{color:'#7ec699'}}> "_yep_uuid=2e2a1-d77d-9cf0-ae3e; e1=%7B%22pid%3A40%7D; ***** ywopenid=790AE057656825589CCF50AABA090D3C"</span>,</p>
+                    <p style={{margin:0}}><span style={{color:'#f8c555'}}>    "User-Agent"</span>:<span style={{color:'#7ec699'}}> "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36"</span></p>
+                    <p style={{margin:0}}>{"  }"}</p>
+                  </code>
+                </pre>
+              </Typography>
+              <Typography gutterBottom>
                 <b style={{color:'#d25353'}}>爬取规则</b>
                 <br/>
                 &nbsp;&nbsp;&nbsp;&nbsp;这是一个非必填项，填写后插件将按照你填写的规则去爬取网站内容。若不填则由插件智能去识别网站信息并爬取内容。若提示智能识别失败，那只能说明插件还不够智能，你可以把你需要爬取的网址提交给我，我会优化插件以支持更多的网站。
                 <br/>
-                <br/>
                 &nbsp;&nbsp;&nbsp;&nbsp;爬取规则分为四个部分，书名、章节目录列表、章节标题、章节内容。只能使用jquery选择器来定义规则。请删除json中的注释后再粘贴到输入框中。
-                <br/>
                 <br/>
                 &nbsp;&nbsp;&nbsp;&nbsp;爬取规则示例如下：
                 <br/>
@@ -580,9 +625,7 @@ export default class App extends React.Component {
                 <br/>
                 &nbsp;&nbsp;&nbsp;&nbsp;这是一个非必填项，填写后，插件爬取章节正文时会过滤掉规则中的文字。
                 <br/>
-                <br/>
                 &nbsp;&nbsp;&nbsp;&nbsp;很多网站的章节正文中会加入一些烦人的广告文字，比如 "请记住本书首发域名：xxx.com"、"最新网址：yyy.com" 。 这些与小说无关的内容非常影响阅读体验，所以可以把这些文字添加到过滤规则中，爬取时会自动删除掉这些文字。
-                <br/>
                 <br/>
                 &nbsp;&nbsp;&nbsp;&nbsp;过滤规则示例如下：
                 <br/>
