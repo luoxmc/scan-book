@@ -3,7 +3,6 @@ const request = require("request");
 const iconv = require('iconv-lite');
 const jschardet = require("jschardet");
 const fs = require("fs");
-const url = require("url");
 
 Date.prototype.format = function(fmt) {
   let o = {
@@ -26,8 +25,6 @@ Date.prototype.format = function(fmt) {
   return fmt;
 }
 
-let defaultHeaders = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36'};
-
 window.services = {
   /*** 获取书籍书名以及章节列表 ***/
   getTask: (url, time, startChapter, headers, rule, filter, callback) => {
@@ -47,7 +44,7 @@ window.services = {
       headers['Connection'] = 'keep-alive';
     }
     console.log(headers);
-    request(url, {encoding: null, gzip: true, headers: headers, timeout:15000}, function (err, res, body) {
+    request(url, {encoding: null, gzip: true, headers: headers, timeout:12000}, function (err, res, body) {
       if (!err && res.statusCode === 200) {
         let _html = window.services.getOkText(body);
         if (!_html) {
@@ -59,7 +56,7 @@ window.services = {
           let getBookName = function () {
             try {
               let result = '';
-              let nameReg = ['.book-info h1 em', '.pt-name a', '.bookNm a' , '.title span', '.f20h', '.caption p', "*title", "*name", 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'h3 a'];
+              let nameReg = ['.book-info h1 em', '.pt-name a', '.bookNm a' , '.title span', '.f20h', '.caption p', '#bookdetail #info h1' , '.tna a' , '*title', '*name', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'h3 a'];
               for (let i = 0; i < nameReg.length; i++) {
                 let tmp;
                 if (nameReg[i].startsWith("*")) {
@@ -82,10 +79,7 @@ window.services = {
                 }
                 for (let j = 0; j < tmp.length; j++) {
                   let tmp1 = tmp[j];
-                  if (tmp1.children.length !== 1) {
-                    continue;
-                  }
-                  let txt = tmp1.children[0].data;
+                  let txt = $(tmp1).text();
                   if (txt && txt.length >= 2 && txt.length <= 20) {
                     if(txt.indexOf('友情链接') !== -1){
                       continue;
@@ -107,7 +101,8 @@ window.services = {
           let getBookMenu = function () {
             try {
               let result = [];
-              let menuReg = ['.volume-wrap ul li a', '#all_chapter a' , '.boxT .lfT li a' , '.booklist span a', "#chapterlist p", '.ccss a', '.book-section a', ".book_con ul li a" ,  '*chapter', '*menu', '*list', 'ul li a', 'dl dd a', 'tr td a'];
+              let menuReg = ['.volume-wrap ul li a', '#all_chapter a' , '.boxT .lfT li a' , '.booklist span a', "#chapterlist p", '.ccss a', '.book-section a', ".book_con ul li a" , '#mulu .DivTable .DivTd a' ,
+                 '#catalog .chapter-item a' , '.conter .clc a' ,  '*chapter', '*menu', '*list', 'ul li a', 'dl dd a', 'tr td a'];
               for (let i = 0; i < menuReg.length; i++) {
                 let tmp;
                 if (menuReg[i].startsWith("*")) {
@@ -297,7 +292,7 @@ window.services = {
     if (!window.services.checkFile(path)) {
       fs.createWriteStream(path);
     }
-    request(task.menu[task.curChapter], {encoding: null, gzip: true, headers: task.headers, timeout:15000}, async function (err, res, body) {
+    request(task.menu[task.curChapter], {encoding: null, gzip: true, headers: task.headers, timeout:12000}, async function (err, res, body) {
       let logs = '<p><span style="margin-right: 4px;padding: 1px 3px;border-radius: 2px;background: #cacaca45;">'+ new Date().format("yyyy-MM-dd hh:mm:ss")+'</span>开始解析url为【'+task.menu[task.curChapter]+'】的章节</p>';
       if (!err && res.statusCode === 200) {
         let _html = window.services.getOkText(body);
@@ -380,7 +375,7 @@ window.services = {
                   let resultCont = await getDynamicContent(href);
                   if(resultCont){
                     resultCont = resultCont.substring(0,resultCont.length-3).replace("callback({content:'","");
-                    resultCont = resultCont.replace(/<\/p>/g,"</p>\n").replace(/<br\s*\/?>/g,"\n");
+                    resultCont = '<div>' + resultCont.replace(/<\/p>/g,"</p>\n").replace(/<br\s*\/?>/g,"\n") + '</div>';
                     result = $(resultCont).text();
                   }
                 }
@@ -426,7 +421,7 @@ window.services = {
                       continue;
                     }
                     if (txt) {
-                      let tmpHtml = $(tmp1).html().replace(/<\/p>/g,"</p>\n").replace(/<br\s*\/?>/g,"\n");
+                      let tmpHtml = '<div>' + $(tmp1).html().replace(/<\/p>/g,"</p>\n").replace(/<br\s*\/?>/g,"\n") + '</div>';
                       result = $(tmpHtml).text();
                       break;
                     }
