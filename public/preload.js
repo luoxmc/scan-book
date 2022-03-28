@@ -27,7 +27,7 @@ Date.prototype.format = function(fmt) {
 
 window.services = {
   /*** 获取书籍书名以及章节列表 ***/
-  getTask: (url, time, startChapter, headers, rule, filter, callback) => {
+  getTask: (url, time, startChapter, endChapter, headers, rule, filter, callback) => {
     let response = {};
     response.err_no = 0;
     response.err_info = "调用成功";
@@ -43,7 +43,6 @@ window.services = {
     if (!headers['Connection']) {
       headers['Connection'] = 'keep-alive';
     }
-    console.log(headers);
     request(url, {encoding: null, gzip: true, headers: headers, timeout:12000}, function (err, res, body) {
       if (!err && res.statusCode === 200) {
         let _html = window.services.getOkText(body);
@@ -160,9 +159,6 @@ window.services = {
                 let txt = '';
                 if (tmp.children.length === 1 && tmp.children[0].type === 'text') {
                   txt = tmp.children[0].data;
-                  if (txt) {
-                    txt = txt.replace(/\s+/g, '');
-                  }
                 }
                 if (!txt) {
                   for (let k = 0; k < tmp.children.length; k++) {
@@ -195,6 +191,10 @@ window.services = {
                     href = url.substring(0, url.lastIndexOf("/") + 1) + href;
                   }
                   result.push(href);
+                  if (endChapter &&  txt.indexOf(endChapter) !== -1) {
+                    //遇到指定的结束章节，结束
+                    break;
+                  }
                 }
               }
               if (startChapter && !startChapterExit) {

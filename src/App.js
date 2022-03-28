@@ -1,21 +1,9 @@
 import React from 'react'
 import { createMuiTheme, ThemeProvider } from '@material-ui/core/styles'
-import {
-  Backdrop,
-  Box,
-  Button,
-  Card,
-  CardActions,
-  CardContent,
-  CircularProgress, Dialog, DialogContent, DialogTitle,
-  Divider,
-  Grid,
-  LinearProgress,
-  Snackbar,
-  TextField,
-  Typography
+import {Backdrop, Box, Button, Card, CardActions, CardContent, CircularProgress, Dialog,
+  DialogContent, DialogTitle, Divider, Grid, LinearProgress, Snackbar, TextField, Typography
 } from '@material-ui/core';
-import {HelpTwoTone} from "@material-ui/icons";
+import {HelpTwoTone, ExpandMore, ExpandLess} from "@material-ui/icons";
 
 
 window.platform = {
@@ -63,6 +51,7 @@ export default class App extends React.Component {
     bookUrl: null,
     interval: null,
     startChapter: null,
+    endChapter: null,
     headers: null,
     rule: null,
     filter: null,
@@ -80,7 +69,8 @@ export default class App extends React.Component {
       id: null,
       task: []
     },
-    showHelp: false
+    showHelp: false,
+    isExpand: false
   }
 
   /***  添加爬书任务  ***/
@@ -97,8 +87,8 @@ export default class App extends React.Component {
       this.showTip("请填写正确的间隔时间（数字）");
       return;
     }
-    if(this.state.interval < 200){
-      this.showTip("间隔时间最少200毫秒");
+    if(this.state.interval < 100){
+      this.showTip("间隔时间最少100毫秒");
       return;
     }
     let rule ;
@@ -160,23 +150,22 @@ export default class App extends React.Component {
     } else if (this.state.tasks.length === 2 && Number(this.state.interval) > 400){
       interval = 400;
     }
-    window.services.getTask(this.state.bookUrl, interval, this.state.startChapter, headers ,rule, filter, (res) => {
+    window.services.getTask(this.state.bookUrl, interval, this.state.startChapter, this.state.endChapter, headers ,rule, filter, (res) => {
       if(res.err_no === 0){
         let tasks = self.state.tasks;
         tasks.unshift(res.result);
-        console.log(res.result);
         self.setState({tasks:JSON.parse(JSON.stringify(tasks))}, () => {
           self.state.bookUrl = '';
           self.state.rule = '';
           self.state.interval = '';
           self.state.filter = '';
           self.state.startChapter = '';
+          self.state.endChapter = '';
           self.state.headers = '';
           self.getOneChapter(res.result);
         });
       } else {
         self.showTip(res.err_info);
-        console.log(res);
       }
       self.closeLoading();
     });
@@ -430,6 +419,10 @@ export default class App extends React.Component {
   closeHelp = (e) => {
     this.setState({showHelp : false});
   }
+  /****   展开和收起高级选项  ****/
+  toggleExpand = () => {
+    this.setState({isExpand : !this.state.isExpand});
+  }
   /****   判断是否为json字符串  ****/
   isJSON = (str) => {
     if (typeof str == 'string') {
@@ -454,7 +447,6 @@ export default class App extends React.Component {
     window.utools.onPluginReady(() => {
       //查询持久化的任务信息
       const res = window.utools.db.get(window.utools.getNativeId() + "/tasks");
-      console.log(res);
       if(res){
         let tasks = res.data;
         if(tasks && tasks.length > 0){
@@ -500,17 +492,27 @@ export default class App extends React.Component {
               <TextField value={this.state.startChapter} id="startChapter" label="开始章节" placeholder="选填,请输入需要指定的开始爬取章节的名称" fullWidth margin="normal"
                          InputLabelProps={{shrink: true}} onChange={(e) => this.inputChange(e)}/>
             </Grid>
-            <Grid item xs={12} sm={6} style={{paddingLeft:'0.8rem'}}>
-              <TextField value={this.state.headers} id="headers" label="header参数" placeholder="选填,发送请求的header参数(json格式)" fullWidth margin="normal"
+            <Grid item xs={12} sm={6} style={{paddingRight:'0.8rem'}}>
+              <TextField value={this.state.endChapter} id="endChapter" label="结束章节" placeholder="选填,请输入需要指定的结束爬取章节的名称" fullWidth margin="normal"
                          InputLabelProps={{shrink: true}} onChange={(e) => this.inputChange(e)}/>
             </Grid>
-            <Grid item xs={12} sm={12}>
-              <TextField value={this.state.rule} id="rule" label="抓取规则" placeholder="选填,请输入该网站的抓取规则(json格式)" multiline fullWidth margin="normal"
-                         maxRows={6} InputLabelProps={{shrink: true}} onChange={(e) => this.inputChange(e)}/>
+            <Grid item xs={12} sm={12} style={{color:'#cacaca'}} hidden={this.state.isExpand}>
+              <div style={{float:'right'}} onClick={this.toggleExpand}><ExpandMore style={{verticalAlign:'middle'}} /> 展开高级选项</div>
             </Grid>
-            <Grid item xs={12} sm={12}>
+            <Grid item xs={12} sm={12} style={{color:'#cacaca'}} hidden={!this.state.isExpand} >
+              <div style={{float:'right'}} onClick={this.toggleExpand}><ExpandLess style={{verticalAlign:'middle'}} /> 收起高级选项</div>
+            </Grid>
+            <Grid item xs={12} sm={12} style={{paddingLeft:'0.8rem'}} hidden={!this.state.isExpand}>
+              <TextField value={this.state.headers} id="headers" label="header参数" placeholder="选填,发送请求的header参数(json格式)" multiline fullWidth margin="normal"
+                         maxRows={5} InputLabelProps={{shrink: true}} onChange={(e) => this.inputChange(e)}/>
+            </Grid>
+            <Grid item xs={12} sm={12} hidden={!this.state.isExpand}>
+              <TextField value={this.state.rule} id="rule" label="抓取规则" placeholder="选填,请输入该网站的抓取规则(json格式)" multiline fullWidth margin="normal"
+                         maxRows={5} InputLabelProps={{shrink: true}} onChange={(e) => this.inputChange(e)}/>
+            </Grid>
+            <Grid item xs={12} sm={12} hidden={!this.state.isExpand}>
               <TextField value={this.state.filter} id="filter" label="过滤规则" placeholder="选填,请输入该网站的正文过滤规则(json格式)" multiline fullWidth margin="normal"
-                         maxRows={6} InputLabelProps={{shrink: true}} onChange={(e) => this.inputChange(e)}/>
+                         maxRows={5} InputLabelProps={{shrink: true}} onChange={(e) => this.inputChange(e)}/>
             </Grid>
             <Grid container xs={12} justifyContent="center" style={{paddingTop:'1rem'}}>
               <Grid item xs={4} sm={2} >
@@ -571,12 +573,14 @@ export default class App extends React.Component {
               <Typography gutterBottom>
                 <b style={{color:'#d25353'}}>间隔时间</b>
                 <br/>
-                &nbsp;&nbsp;&nbsp;&nbsp;大部分的网站为了防止被攻击，都会设置拦截器防止连续请求，所以设置一个爬取间隔时间是非常有必要的。单位为毫秒，最小值为200毫秒。
+                &nbsp;&nbsp;&nbsp;&nbsp;大部分的网站为了防止被攻击，都会设置拦截器防止连续请求，所以设置一个爬取间隔时间是非常有必要的。单位为毫秒，最小值为100毫秒。
               </Typography>
               <Typography gutterBottom>
-                <b style={{color:'#d25353'}}>开始章节</b>
+                <b style={{color:'#d25353'}}>开始章节/结束章节</b>
                 <br/>
-                &nbsp;&nbsp;&nbsp;&nbsp;这是一个非必填项，插件默认是从第一章开始爬取。但是如果之前的章节你已经看过了，只需要从特定的章节开始爬取，那么在此项填入你需要的开始章节的名称即可。 比如 "第十一章 少女和飞剑" ，或者 "少女和飞剑"
+                &nbsp;&nbsp;&nbsp;&nbsp;开始章节：这是一个非必填项，插件默认是从第一章开始爬取。但是如果之前的章节你已经看过了，只需要从特定的章节开始爬取，那么在此项填入你需要的开始章节的名称即可。 比如 "第十一章 少女和飞剑" ，或者 "少女和飞剑"
+                <br/>
+                &nbsp;&nbsp;&nbsp;&nbsp;结束章节：同上，抓取任务抓取到您定义的结束章节后，抓取任务状态会变为成功。
               </Typography>
               <Typography gutterBottom>
                 <b style={{color:'#d25353'}}>header参数</b>
