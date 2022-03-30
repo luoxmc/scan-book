@@ -55,6 +55,7 @@ export default class App extends React.Component {
     headers: null,
     rule: null,
     filter: null,
+    proxyPool: null,
     tasks: [],
     msg: {
       show: false,
@@ -117,6 +118,19 @@ export default class App extends React.Component {
         return;
       }
     }
+    let proxy;
+    if(this.state.proxyPool){
+      if (this.isJSON(this.state.proxyPool)) {
+        proxy = JSON.parse(this.state.proxyPool);
+        if(!proxy || proxy.length <= 0){
+          this.showTip("代理设置不正确，请检查规则json是否为数组格式");
+          return;
+        }
+      } else {
+        this.showTip("代理格式不正确，请检查");
+        return;
+      }
+    }
     let headers;
     if(this.state.headers){
       if (this.isJSON(this.state.headers)) {
@@ -150,7 +164,7 @@ export default class App extends React.Component {
     } else if (this.state.tasks.length === 2 && Number(this.state.interval) > 400){
       interval = 400;
     }
-    window.services.getTask(this.state.bookUrl, interval, this.state.startChapter, this.state.endChapter, headers ,rule, filter, (res) => {
+    window.services.getTask(this.state.bookUrl, interval, this.state.startChapter, this.state.endChapter, headers ,rule, filter, proxy, (res) => {
       if(res.err_no === 0){
         let tasks = self.state.tasks;
         tasks.unshift(res.result);
@@ -162,6 +176,7 @@ export default class App extends React.Component {
           self.state.startChapter = '';
           self.state.endChapter = '';
           self.state.headers = '';
+          self.state.proxyPool = '';
           self.getOneChapter(res.result);
         });
       } else {
@@ -175,6 +190,15 @@ export default class App extends React.Component {
     if(task && task.menu && task.menu.length > 0){
       let self = this;
       if(task.curChapter < task.menu.length){
+        //如果配置了代理池，每五个请求循环换一次代理
+        if (task.curChapter !== 0 && task.proxy && task.proxy.length > 0 && task.curChapter%5 === 0) {
+          if(task.curProxyIndex === task.proxy.length - 1){
+            task.curProxyIndex = 0;
+          } else {
+            task.curProxyIndex += 1;
+          }
+          task.curProxy = task.proxy[task.curProxyIndex];
+        }
         window.services.getChapter(task, (res) => {
           task.log += res.log;
           if(res.err_no === 0){
@@ -514,6 +538,10 @@ export default class App extends React.Component {
               <TextField value={this.state.filter} id="filter" label="过滤规则" placeholder="选填,请输入该网站的正文过滤规则(json格式)" multiline fullWidth margin="normal"
                          maxRows={5} InputLabelProps={{shrink: true}} onChange={(e) => this.inputChange(e)}/>
             </Grid>
+            <Grid item xs={12} sm={12} hidden={!this.state.isExpand}>
+              <TextField value={this.state.proxyPool} id="proxyPool" label="代理池" placeholder="选填,请输入要使用的代理列表(json格式)" multiline fullWidth margin="normal"
+                         maxRows={5} InputLabelProps={{shrink: true}} onChange={(e) => this.inputChange(e)}/>
+            </Grid>
             <Grid container xs={12} justifyContent="center" style={{paddingTop:'1rem'}}>
               <Grid item xs={4} sm={2} >
                 <Button  variant="contained" style={{width:'100%'}} onClick={this.addTask}>添加爬取任务</Button>
@@ -594,8 +622,8 @@ export default class App extends React.Component {
                 <pre>
                   <code>
                     <p style={{margin:0}}>{"  {"}</p>
-                    <p style={{margin:0}}><span style={{color:'#f8c555'}}>    "cookie"</span>:<span style={{color:'#7ec699'}}> "_yep_uuid=2e2a1-d77d-9cf0-ae3e; e1=%7B%22pid%3A40%7D; ***** ywopenid=790AE057656825589CCF50AABA090D3C"</span>,</p>
-                    <p style={{margin:0}}><span style={{color:'#f8c555'}}>    "User-Agent"</span>:<span style={{color:'#7ec699'}}> "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36"</span></p>
+                    <p style={{margin:0}}><span style={{color:'#f8c555'}}>    "cookie"</span>:<span style={{color:'#7ec699'}}> "_yep_uuid=2e2a1-ae3e; e1=%7B; ***** openid=7D3C"</span>,</p>
+                    <p style={{margin:0}}><span style={{color:'#f8c555'}}>    "User-Agent"</span>:<span style={{color:'#7ec699'}}> "Mozilla/5.0 *** Chrome/96 Safari/537.36"</span></p>
                     <p style={{margin:0}}>{"  }"}</p>
                   </code>
                 </pre>
@@ -639,6 +667,25 @@ export default class App extends React.Component {
                     <p style={{margin:0}}><span style={{color:'#7ec699'}}>    "请记住本书首发域名：xxx.com"</span>,</p>
                     <p style={{margin:0}}><span style={{color:'#7ec699'}}>    "最新网址：yyy.com"</span>,</p>
                     <p style={{margin:0}}><span style={{color:'#7ec699'}}>    "加入书签"</span></p>
+                    <p style={{margin:0}}>{"  ]"}</p>
+                  </code>
+                </pre>
+              </Typography>
+              <Typography gutterBottom>
+                <b style={{color:'#d25353'}}>代理池</b>
+                <br/>
+                &nbsp;&nbsp;&nbsp;&nbsp;这是一个非必填项，填写后，插件会循环使用配置的代理池中的代理去爬取章节。设计此功能是因为很多网站会根据ip反爬，请求过于频繁会被封ip，而使用几个代理循环去调用的话，被封ip的几率会大大降低。
+                <br/>
+                &nbsp;&nbsp;&nbsp;&nbsp;注意，代理池使用规则为： 本机直连和配置的所有代理加在一起形成一个池子，循环使用池子中的配置发送请求，每发5次章节请求循环一次
+                <br/>
+                &nbsp;&nbsp;&nbsp;&nbsp;请确保配置的代理池中的所有代理都是有效的，并且支持http、https协议的。代理规则示例如下：
+                <br/>
+                <pre>
+                  <code>
+                    <p style={{margin:0}}>{"  ["}</p>
+                    <p style={{margin:0}}><span style={{color:'#7ec699'}}>    "137.12.5.7:2345"</span>,</p>
+                    <p style={{margin:0}}><span style={{color:'#7ec699'}}>    "178.42.6.147:4567"</span>,</p>
+                    <p style={{margin:0}}><span style={{color:'#7ec699'}}>    "123.134.10.65:3128"</span></p>
                     <p style={{margin:0}}>{"  ]"}</p>
                   </code>
                 </pre>

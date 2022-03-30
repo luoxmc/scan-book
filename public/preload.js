@@ -2,6 +2,7 @@ const cheerio = require("cheerio");
 const request = require("request");
 const iconv = require('iconv-lite');
 const jschardet = require("jschardet");
+const { HttpProxyAgent,HttpsProxyAgent } = require('hpagent');
 const fs = require("fs");
 
 Date.prototype.format = function(fmt) {
@@ -27,7 +28,7 @@ Date.prototype.format = function(fmt) {
 
 window.services = {
   /*** 获取书籍书名以及章节列表 ***/
-  getTask: (url, time, startChapter, endChapter, headers, rule, filter, callback) => {
+  getTask: (url, time, startChapter, endChapter, headers, rule, filter, proxy, callback) => {
     let response = {};
     response.err_no = 0;
     response.err_info = "调用成功";
@@ -256,6 +257,12 @@ window.services = {
               task.curChapter = 0;
               task.interval = time;
               task.log = '';
+              if (proxy) {
+                proxy.unshift('localhost');
+                task.proxy = proxy;
+                task.curProxyIndex = 0;
+                task.curProxy = 'localhost'
+              }
               response.result = task;
               callback(response);
             }
@@ -292,7 +299,30 @@ window.services = {
     if (!window.services.checkFile(path)) {
       fs.createWriteStream(path);
     }
-    request(task.menu[task.curChapter], {encoding: null, gzip: true, headers: task.headers, timeout:12000}, async function (err, res, body) {
+    let options = {encoding: null, gzip: true, headers: task.headers, timeout:15000};
+    //代理配置
+    if (task.proxy && task.proxy.length > 0) {
+      let proxy = "http://" + task.curProxy;
+      if ("http://localhost" !== proxy) {
+        let agent = task.menu[task.curChapter].startsWith("https") ? new HttpsProxyAgent({
+          keepAlive: true,
+          keepAliveMsecs: 5000,
+          maxSockets: 256,
+          maxFreeSockets: 256,
+          scheduling: 'lifo',
+          proxy
+        }) : new HttpProxyAgent({
+          keepAlive: true,
+          keepAliveMsecs: 5000,
+          maxSockets: 256,
+          maxFreeSockets: 256,
+          scheduling: 'lifo',
+          proxy
+        });
+        options.agent = agent;
+      }
+    }
+    request(task.menu[task.curChapter], options, async function (err, res, body) {
       let logs = '<p><span style="margin-right: 4px;padding: 1px 3px;border-radius: 2px;background: #cacaca45;">'+ new Date().format("yyyy-MM-dd hh:mm:ss")+'</span>开始解析url为【'+task.menu[task.curChapter]+'】的章节</p>';
       if (!err && res.statusCode === 200) {
         let _html = window.services.getOkText(body);
