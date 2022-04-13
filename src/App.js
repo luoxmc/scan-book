@@ -317,10 +317,10 @@ export default class App extends React.Component {
     });
   }
   /***  保存文件或者删除任务  ***/
-  saveTxt = (e,task) => {
+  saveTxt = (e,task,saveFlag) => {
     let self = this;
     let state = self.state;
-    if(task.status === 2){
+    if(task.status === 2 || saveFlag){
       let separator = window.platform.isWindows ? "\u005C" : "/";
       let savePath = window.utools.showSaveDialog({title: '保存位置',defaultPath: window.utools.getPath('downloads') + separator + task.name + ".txt",buttonLabel: '保存'});
       if(savePath){
@@ -572,6 +572,7 @@ export default class App extends React.Component {
                         <Button size="small" onClick={(e) => this.showLog(e,value)}>查看详情</Button>
                         <Button size="small" style={{display: value.status === 2 ? 'none':'inline-flex'}} color="primary" onClick={(e) => this.pauseTask(e,value)}>{pauseFlag[value.id] || value.status === 4 ? "恢复" : "暂停"}</Button>
                         <Button size="small" style={{display: value.status !== 4 ? 'none':'inline-flex'}} color="primary" onClick={(e) => this.skipChapter(e,value)}>跳过此章</Button>
+                        <Button size="small" style={{display: value.status !== 1 ? 'none':'inline-flex'}} color={"primary"} onClick={(e) => this.saveTxt(e,value,true)}>保存</Button>
                         <Button size="small" style={{display: value.status === 0 ? 'none':'inline-flex'}} color={value.status === 2 ? "primary" : "secondary"} onClick={(e) => this.saveTxt(e,value)}>{value.status === 2 ? "保存" : "删除"}</Button>
                       </CardActions>
                     </Card>

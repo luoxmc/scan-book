@@ -101,7 +101,8 @@ window.services = {
           let getBookMenu = function () {
             try {
               let result = [];
-              let menuReg = ['.volume-wrap ul li a', '#all_chapter a' , '.boxT .lfT li a' , '.booklist span a', "#chapterlist p", '.ccss a', '.book-section a', ".book_con ul li a" , '#mulu .DivTable .DivTd a' ,
+              let menuReg = ['#list dl dd a','.listmain dl dd a','.volume-wrap ul li a', '#all_chapter a' , '.boxT .lfT li a' , '.booklist span a',
+                  "#chapterlist p", '.ccss a', '.book-section a', ".book_con ul li a" , '#mulu .DivTable .DivTd a' ,
                  '#catalog .chapter-item a' , '.conter .clc a' ,  '*chapter', '*menu', '*list', 'ul li a', 'dl dd a', 'tr td a'];
               for (let i = 0; i < menuReg.length; i++) {
                 let tmp;
@@ -336,7 +337,7 @@ window.services = {
           let getChapterTitle = function () {
             let result = '';
             let tmpTxt = '';
-            let nameReg = [ '.readAreaBox h1', '.content-wrap', '.art_tit', '*title', '*name', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'h1 span'];
+            let nameReg = [ '.box_con .bookname h1', '#book .content h1', '#box_con .bookname h1', '.readAreaBox h1', '.content-wrap', '.art_tit', '*title', '*name', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'h1 span'];
             for (let i = 0; i < nameReg.length; i++) {
               let tmp;
               if (nameReg[i].startsWith("*")) {
