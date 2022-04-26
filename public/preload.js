@@ -179,7 +179,8 @@ window.services = {
                   startChapterExit = true;
                 } else if (!startChapter && (txt.indexOf("第一章") !== -1 || txt.indexOf("第1章") !== -1 || txt.indexOf("序") !== -1 || txt.indexOf("楔子") !== -1 || txt.indexOf("前言") !== -1
                     || txt.indexOf("第一卷") !== -1 || txt.indexOf("第1卷") !== -1 || txt.indexOf("第一回") !== -1 || txt.indexOf("第1回") !== -1 || txt.indexOf("第01章") !== -1
-                    || txt.indexOf("第一页") !== -1 || txt.indexOf("第1页") !== -1 || txt.indexOf("0001") !== -1 || txt.indexOf("001") !== -1) ) {
+                    || txt.indexOf("第一页") !== -1 || txt.indexOf("第1页") !== -1 || txt.indexOf("0001") !== -1 || txt.indexOf("001") !== -1
+                    || txt.startsWith("1") || txt.startsWith("01")  || txt.startsWith("001") || txt.startsWith("一") ) ) {
                   start = true;
                 }
                 if (start) {
@@ -238,7 +239,7 @@ window.services = {
               menu = getBookMenu();
               if (!menu || menu.length <= 0) {
                 response.err_no = 6;
-                response.err_info = '智能解析章节列表失败，可能暂未支持该网站';
+                response.err_info = '智能解析章节列表失败，可能未识别到起始章节或暂未支持该网站';
               }
             }
             if (typeof menu === 'string') {
