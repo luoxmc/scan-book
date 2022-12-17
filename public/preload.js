@@ -301,7 +301,7 @@ window.services = {
     if (!window.services.checkFile(path)) {
       fs.createWriteStream(path);
     }
-    let options = {encoding: null, gzip: true, headers: task.headers, timeout:15000};
+    let options = {encoding: null, gzip: true, headers: task.headers, timeout:10000};
     //代理配置
     if (task.proxy && task.proxy.length > 0) {
       let proxy = "http://" + task.curProxy;

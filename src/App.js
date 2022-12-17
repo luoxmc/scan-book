@@ -1,7 +1,8 @@
 import React from 'react'
 import { createMuiTheme, ThemeProvider } from '@material-ui/core/styles'
-import {Backdrop, Box, Button, Card, CardActions, CardContent, CircularProgress, Dialog,
-  DialogContent, DialogTitle, Divider, Grid, LinearProgress, Snackbar, TextField, Typography
+import {
+  Backdrop, Box, Button, Card, CardActions, CardContent, Checkbox, CircularProgress, Dialog,
+  DialogContent, DialogTitle, Divider, FormControlLabel, Grid, LinearProgress, Snackbar, TextField, Typography
 } from '@material-ui/core';
 import {HelpTwoTone, ExpandMore, ExpandLess} from "@material-ui/icons";
 
@@ -71,7 +72,9 @@ export default class App extends React.Component {
       task: []
     },
     showHelp: false,
-    isExpand: false
+    isExpand: false,
+    autoRetry: false,
+    prepareRetry: {}
   }
 
   /***  添加爬书任务  ***/
@@ -141,8 +144,8 @@ export default class App extends React.Component {
       }
     }
     if(this.state.tasks){
-      if(this.state.tasks.length >= 3){
-        this.showTip("最多同时执行三个抓取任务，请稍后再试");
+      if(this.state.tasks.length >= 5){
+        this.showTip("最多同时执行五个抓取任务，请稍后再试");
         return;
       }
       let flag = false;
@@ -187,6 +190,7 @@ export default class App extends React.Component {
   }
   /***  爬取一个章节并且更新状态  ***/
   getOneChapter = (task) => {
+    if (this.state.prepareRetry[task.id]) delete this.state.prepareRetry[task.id]
     if(task && task.menu && task.menu.length > 0){
       let self = this;
       if(task.curChapter < task.menu.length){
@@ -234,7 +238,7 @@ export default class App extends React.Component {
                 if(state.log.show && scrollFlag){
                   setTimeout(() => {
                     if(document.getElementById("logContent")){
-                      document.getElementById("logContent").scrollTop = document.getElementById("logContent").scrollHeight;
+                      document.getElementById("logContent").scrollTo({top:document.getElementById("logContent").scrollHeight,behavior: 'smooth'});
                     }
                   },50);
                 }
@@ -267,6 +271,14 @@ export default class App extends React.Component {
                   }
                   resDb.data = tasks;
                   window.utools.db.put(resDb);
+                  if (task.status === 4 && self.state.autoRetry) {
+                    self.state.prepareRetry[task.id] = true
+                    setTimeout(() => {
+                      if (self.state.prepareRetry[task.id]) {
+                        self.pauseTask(null,task);
+                      }
+                    },5000);
+                  }
                 }
               });
             }
@@ -286,7 +298,9 @@ export default class App extends React.Component {
           pauseFlag[task.id] = false;
           task.status = 0;
           task.statusText = '任务处理中';
-          task.log += '<p style="color: green"><span style="margin-right: 4px;padding: 1px 3px;border-radius: 2px;background: #cacaca45;">'+ new Date().format("yyyy-MM-dd hh:mm:ss")+'</span>任务已恢复</p>';
+          let msg  = '任务已恢复';
+          if (self.state.prepareRetry[task.id]) msg = '已为您自动恢复任务'
+          task.log += '<p style="color: green"><span style="margin-right: 4px;padding: 1px 3px;border-radius: 2px;background: #cacaca45;">'+ new Date().format("yyyy-MM-dd hh:mm:ss")+'</span>' + msg + '</p>';
           state.tasks.splice(idx, 1, task);
           self.setState( JSON.parse(JSON.stringify(state)), () => {
             self.getOneChapter(task);
@@ -414,10 +428,10 @@ export default class App extends React.Component {
   /****  打开关闭任务日志  ****/
   handleScroll = () => {
     const { scrollHeight, scrollTop, clientHeight } = document.getElementById("logContent");
-    if (scrollHeight - scrollTop === clientHeight) {
-      scrollFlag = true;
-    } else if (scrollHeight - scrollTop > clientHeight + 130) {
+    if (scrollHeight - scrollTop > clientHeight + 130) {
       scrollFlag = false;
+    } else {
+      scrollFlag = true;
     }
   }
   showLog = (e,task) => {
@@ -446,6 +460,16 @@ export default class App extends React.Component {
   /****   展开和收起高级选项  ****/
   toggleExpand = () => {
     this.setState({isExpand : !this.state.isExpand});
+  }
+  /****   切换任务自动重试状态  ****/
+  radioChange = () => {
+    let self = this
+    self.state.autoRetry = !self.state.autoRetry
+    this.setState({autoRetry: self.state.autoRetry}, () => {
+      const res1 = window.utools.db.get(window.utools.getNativeId() + "/retry");
+      res1.data = self.state.autoRetry
+      window.utools.db.put(res1);
+    });
   }
   /****   判断是否为json字符串  ****/
   isJSON = (str) => {
@@ -487,6 +511,17 @@ export default class App extends React.Component {
         let data = {
           _id : window.utools.getNativeId() + "/tasks",
           data : []
+        }
+        window.utools.db.put(data);
+      }
+      //查询重试标志
+      const res1 = window.utools.db.get(window.utools.getNativeId() + "/retry");
+      if(res1){
+          this.setState({autoRetry: res1.data});
+      } else {
+        let data = {
+          _id : window.utools.getNativeId() + "/retry",
+          data : false
         }
         window.utools.db.put(data);
       }
@@ -545,6 +580,12 @@ export default class App extends React.Component {
             <Grid container xs={12} justifyContent="center" style={{paddingTop:'1rem'}}>
               <Grid item xs={4} sm={2} >
                 <Button  variant="contained" style={{width:'100%'}} onClick={this.addTask}>添加爬取任务</Button>
+                <FormControlLabel style={{position:'absolute',left:'3rem'}}
+                                  control={
+                                    <Checkbox checked={this.state.autoRetry} onChange={this.radioChange} color="primary" size="small"/>
+                                  }
+                                  label="中断5秒后自动重试"
+                />
               </Grid>
             </Grid>
             <Grid container spacing={4} style={{marginTop:'2rem'}}>
