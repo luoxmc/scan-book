@@ -57,6 +57,7 @@ export default class App extends React.Component {
     rule: null,
     filter: null,
     proxyPool: null,
+    paginate: null,
     tasks: [],
     msg: {
       show: false,
@@ -159,6 +160,7 @@ export default class App extends React.Component {
         return;
       }
     }
+    let paginate = this.state.paginate;
     let self = this;
     self.showLoading();
     let interval = Number(this.state.interval);
@@ -167,7 +169,7 @@ export default class App extends React.Component {
     } else if (this.state.tasks.length === 2 && Number(this.state.interval) > 400){
       interval = 400;
     }
-    window.services.getTask(this.state.bookUrl, interval, this.state.startChapter, this.state.endChapter, headers ,rule, filter, proxy, (res) => {
+    window.services.getTask(this.state.bookUrl, interval, this.state.startChapter, this.state.endChapter, headers ,rule, filter, proxy, paginate, (res) => {
       if(res.err_no === 0){
         let tasks = self.state.tasks;
         tasks.unshift(res.result);
@@ -180,6 +182,7 @@ export default class App extends React.Component {
           self.state.endChapter = '';
           self.state.headers = '';
           self.state.proxyPool = '';
+          self.state.paginate = '';
           self.getOneChapter(res.result);
         });
       } else {
@@ -575,6 +578,10 @@ export default class App extends React.Component {
             </Grid>
             <Grid item xs={12} sm={12} hidden={!this.state.isExpand}>
               <TextField value={this.state.proxyPool} id="proxyPool" label="代理池" placeholder="选填,请输入要使用的代理列表(json格式)" multiline fullWidth margin="normal"
+                         maxRows={5} InputLabelProps={{shrink: true}} onChange={(e) => this.inputChange(e)}/>
+            </Grid>
+            <Grid item xs={12} sm={12} hidden={!this.state.isExpand}>
+              <TextField value={this.state.paginate} id="paginate" label="分页标识" placeholder="和第一页的区别，如123.html和123_2.html，填_2，不支持多页" multiline fullWidth margin="normal"
                          maxRows={5} InputLabelProps={{shrink: true}} onChange={(e) => this.inputChange(e)}/>
             </Grid>
             <Grid container xs={12} justifyContent="center" style={{paddingTop:'1rem'}}>

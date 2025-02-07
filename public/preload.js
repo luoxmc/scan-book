@@ -28,7 +28,7 @@ Date.prototype.format = function(fmt) {
 
 window.services = {
   /*** 获取书籍书名以及章节列表 ***/
-  getTask: (url, time, startChapter, endChapter, headers, rule, filter, proxy, callback) => {
+  getTask: (url, time, startChapter, endChapter, headers, rule, filter, proxy, paginate, callback) => {
     let response = {};
     response.err_no = 0;
     response.err_info = "调用成功";
@@ -194,6 +194,13 @@ window.services = {
                     href = url.substring(0, url.lastIndexOf("/") + 1) + href;
                   }
                   result.push(href);
+                  if (paginate) {
+                    // 拼接标识符
+                    const hrefArr = href.split('.');
+                    const lastIndex = hrefArr.length - 1;
+                    hrefArr[lastIndex - 1] = hrefArr[lastIndex - 1] + paginate;
+                    result.push(hrefArr.join('.'));
+                  }
                   if (endChapter &&  txt.indexOf(endChapter) !== -1) {
                     //遇到指定的结束章节，结束
                     break;
