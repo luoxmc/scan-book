@@ -56,7 +56,7 @@ window.services = {
           let getBookName = function () {
             try {
               let result = '';
-              let nameReg = ['.book-info h1 em', '.pt-name a', '.bookNm a' , '.title span', '.f20h', '.caption p', '#bookdetail #info h1' , '.tna a' , '*title', '*name', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'h3 a'];
+              let nameReg = ['#info h1', '.info h1', '.book-info h1 em', '.bookinfo h1', '.pt-name a', '.bookNm a' , '.title span', '.f20h', '.caption p', '#bookdetail #info h1' , '.tna a' , '*title', '*name', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'h3 a'];
               for (let i = 0; i < nameReg.length; i++) {
                 let tmp;
                 if (nameReg[i].startsWith("*")) {
@@ -101,8 +101,8 @@ window.services = {
           let getBookMenu = function () {
             try {
               let result = [];
-              let menuReg = ['#list dl dd a','.listmain dl dd a','.volume-wrap ul li a', '#all_chapter a' , '.boxT .lfT li a' , '.booklist span a',
-                  "#chapterlist p", '.ccss a', '.book-section a', ".book_con ul li a" , '#mulu .DivTable .DivTd a' ,
+              let menuReg = ['#list dl dd a','.listmain dl dd a', '.book_list ul li a', '#chapterList li a', '.volume-wrap ul li a', '#all_chapter a' , '.boxT .lfT li a' , '.booklist span a',
+                  '.listmain dl dd a', '#list ul li a', '.section-box .section-list li a', "#chapterlist p", '.ccss a', '.book-section a', ".book_con ul li a" , '#mulu .DivTable .DivTd a' ,
                  '#catalog .chapter-item a' , '.conter .clc a' ,  '*chapter', '*menu', '*list', 'ul li a', 'dl dd a', 'tr td a'];
               for (let i = 0; i < menuReg.length; i++) {
                 let tmp;
@@ -413,7 +413,8 @@ window.services = {
                 }
               } else {
                 let tmpTxt = '';
-                let contentReg = [ '.read-content', '#ChapterBody', '.readAreaBox .p' , '.novel_content', '.box_box', '.showtxt','.panel-body', '.main_content .book_con' , '.zw','*content','*text','*txt','*nr','*chapter','*cont','*article','*read' ];
+                let contentReg = [ '.read-content', '#ChapterBody', '.readAreaBox .p' , '.read_chapterDetail', '.novel_content', '.box_box', '#Lab_Contents', '#chaptercontent',
+                  '#acontent', '.container .con', '.showtxt','.panel-body', '.main_content .book_con' , '.zw', '*content','*text','*txt','*nr','*chapter','*cont','*article','*read' ];
                 for (let i = 0; i < contentReg.length; i++) {
                   let tmp;
                   if (contentReg[i].startsWith("*")) {
