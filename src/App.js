@@ -201,6 +201,7 @@ export default class App extends React.Component {
           headers: '',
           proxyPool: ''
         }), () => {
+          self.upsertTaskToDb(task);
           self.runTask(task);
         });
       } else {
@@ -353,9 +354,9 @@ export default class App extends React.Component {
 
   upsertTaskToDb = (task) => {
     try {
-      const resDb = window.utools.db.get(window.utools.getNativeId() + "/tasks");
-      if (!resDb) return;
-      let tasks = resDb.data || [];
+      const nativeId = window.utools.getNativeId();
+      const indexKey = nativeId + "/tasks";
+      const taskKey = nativeId + "/task/" + task.id;
 
       // 不持久化运行态字段，避免体积/恢复问题
       let stored = JSON.parse(JSON.stringify(task));
@@ -363,22 +364,23 @@ export default class App extends React.Component {
       delete stored.runningCount;
       delete stored.requestCount;
 
-      let findIt = false;
-      if(tasks && tasks.length > 0){
-        for (let i = 0; i < tasks.length; i++ ) {
-          let ele = tasks[i];
-          if(ele && ele.id === task.id){
-            findIt = true;
-            tasks.splice(i, 1, stored);
-            break;
-          }
-        }
+      // 1) 单本书单独存一份，避免 tasks 一个 key 超过 1M 限制
+      const oldTaskDoc = window.utools.db.get(taskKey);
+      const taskDoc = oldTaskDoc ? Object.assign({}, oldTaskDoc) : { _id: taskKey };
+      taskDoc.data = stored;
+      window.utools.db.put(taskDoc);
+
+      // 2) tasks key 只保存各书籍对应的 key 列表
+      let indexDoc = window.utools.db.get(indexKey);
+      if (!indexDoc) {
+        indexDoc = { _id: indexKey, data: [] };
       }
-      if(!findIt){
-        tasks.unshift(stored);
+      let keys = Array.isArray(indexDoc.data) ? indexDoc.data.filter((k) => typeof k === 'string') : [];
+      if (!keys.includes(taskKey)) {
+        keys.unshift(taskKey);
       }
-      resDb.data = tasks;
-      window.utools.db.put(resDb);
+      indexDoc.data = keys;
+      window.utools.db.put(indexDoc);
     } catch (e) {
       console.log(e);
     }
@@ -386,20 +388,23 @@ export default class App extends React.Component {
 
   removeTaskFromDb = (taskId) => {
     try {
-      const resDb = window.utools.db.get(window.utools.getNativeId() + "/tasks");
-      if (!resDb) return;
-      let tasks = resDb.data || [];
-      if(tasks && tasks.length > 0){
-        for (let j = 0; j < tasks.length; j++ ) {
-          let ele = tasks[j];
-          if(ele && ele.id === taskId){
-            tasks.splice(j, 1);
-            break;
-          }
-        }
+      const nativeId = window.utools.getNativeId();
+      const indexKey = nativeId + "/tasks";
+      const taskKey = nativeId + "/task/" + taskId;
+
+      // 更新索引
+      const indexDoc = window.utools.db.get(indexKey);
+      if (indexDoc) {
+        let keys = Array.isArray(indexDoc.data) ? indexDoc.data.filter((k) => typeof k === 'string') : [];
+        indexDoc.data = keys.filter((k) => k !== taskKey);
+        window.utools.db.put(indexDoc);
       }
-      resDb.data = tasks;
-      window.utools.db.put(resDb);
+      // 删除任务本体
+      try {
+        window.utools.db.remove(taskKey);
+      } catch (e1) {
+        // ignore
+      }
     } catch (e) {
       console.log(e);
     }
@@ -687,30 +692,59 @@ export default class App extends React.Component {
     })
     window.utools.onPluginReady(() => {
       //查询持久化的任务信息
-      const res = window.utools.db.get(window.utools.getNativeId() + "/tasks");
-      if(res){
-        let tasks = res.data;
-        if(tasks && tasks.length > 0){
-          tasks.forEach((ele) => {
-            if(!ele || !ele.id){
-              return;
-            }
-            this.normalizeTask(ele);
-            if(ele.status === 1){
-              pauseFlag[ele.id] = true;
-            }
-          });
-          this.setState({tasks: tasks});
-        } else {
-          window.services.emptyTempDir();
-        }
-      } else {
-        let data = {
-          _id : window.utools.getNativeId() + "/tasks",
-          data : []
-        }
-        window.utools.db.put(data);
+      const nativeId = window.utools.getNativeId();
+      const indexKey = nativeId + "/tasks";
+      let indexDoc = window.utools.db.get(indexKey);
+      if (!indexDoc) {
+        indexDoc = { _id: indexKey, data: [] };
+        window.utools.db.put(indexDoc);
+        window.services.emptyTempDir();
+        return;
       }
+
+      // 新结构：tasks key 里仅存 taskKey 列表；不考虑历史数据，非字符串则直接清空
+      let keys = Array.isArray(indexDoc.data) ? indexDoc.data.filter((k) => typeof k === 'string') : [];
+      if (!Array.isArray(indexDoc.data) || keys.length !== indexDoc.data.length) {
+        indexDoc.data = keys;
+        window.utools.db.put(indexDoc);
+      }
+
+      if (!keys || keys.length <= 0) {
+        window.services.emptyTempDir();
+        return;
+      }
+
+      // 最多保留/恢复前 5 个任务（与 UI 限制保持一致）
+      if (keys.length > 5) {
+        keys = keys.slice(0, 5);
+        indexDoc.data = keys;
+        window.utools.db.put(indexDoc);
+      }
+      let tasks = [];
+      let keptKeys = [];
+      keys.forEach((k) => {
+        const doc = window.utools.db.get(k);
+        if (doc && doc.data && doc.data.id) {
+          tasks.push(doc.data);
+          keptKeys.push(k);
+        }
+      });
+      if (keptKeys.length !== keys.length) {
+        indexDoc.data = keptKeys;
+        window.utools.db.put(indexDoc);
+      }
+      if (tasks.length <= 0) {
+        window.services.emptyTempDir();
+        return;
+      }
+      tasks.forEach((ele) => {
+        if (!ele || !ele.id) return;
+        this.normalizeTask(ele);
+        if (ele.status === 1) {
+          pauseFlag[ele.id] = true;
+        }
+      });
+      this.setState({ tasks });
     })
     window.utools.onPluginOut(() => {
 
