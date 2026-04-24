@@ -26,9 +26,70 @@ Date.prototype.format = function(fmt) {
   return fmt;
 }
 
+const absUrl = function (url,base) {
+  if (!url || !base) return null
+  if (url.startsWith("http")) return url
+  if (url.startsWith("//")) {
+    let protocol = base.substring(0,base.indexOf("//")) //https:
+    if (!protocol) return null
+    return protocol + url
+  }
+  try {
+    let urlObj = new URL(url,base)
+    if (!urlObj) return null
+    return urlObj.href
+  } catch (e) {
+    console.error('exchange url error, msg : ',e)
+    return null
+  }
+}
+
+const escapeRegExp = function (str) {
+  if (str === null || str === undefined) return ''
+  return String(str).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+const buildFilterRegExp = function (filterItem) {
+  // 1) 字符串：默认按“纯文本”处理；若为 /pattern/flags 格式则按正则处理
+  if (typeof filterItem === 'string') {
+    let s = filterItem.trim()
+    let m = s.match(/^\/([\s\S]*)\/([gimsuy]*)$/)
+    if (m) {
+      let pattern = m[1]
+      let flags = m[2] || 'g'
+      return new RegExp(pattern, flags)
+    }
+    return new RegExp(escapeRegExp(s), 'g')
+  }
+
+  // 2) 对象：支持 { pattern, flags } 或 { regex, flags }（按正则处理）
+  if (filterItem && typeof filterItem === 'object') {
+    let pattern = null
+    let flags = null
+    if (typeof filterItem.pattern === 'string') {
+      pattern = filterItem.pattern
+      flags = typeof filterItem.flags === 'string' ? filterItem.flags : null
+    } else if (typeof filterItem.regex === 'string') {
+      pattern = filterItem.regex
+      flags = typeof filterItem.flags === 'string' ? filterItem.flags : null
+    } else if (typeof filterItem.text === 'string') {
+      return new RegExp(escapeRegExp(filterItem.text), 'g')
+    }
+    if (!pattern) {
+      return null
+    }
+    return new RegExp(pattern, flags || 'g')
+  }
+  return null
+}
+
 window.services = {
   /*** 获取书籍书名以及章节列表 ***/
-  getTask: (url, time, startChapter, endChapter, headers, rule, filter, proxy, callback) => {
+  getTask: (url, concurrency, startChapter, endChapter, headers, rule, filter, proxy, page, callback) => {
+    if (typeof page === 'function') {
+      callback = page;
+      page = null;
+    }
     let response = {};
     response.err_no = 0;
     response.err_info = "调用成功";
@@ -147,69 +208,57 @@ window.services = {
               return null;
             }
           }
-          let checkMenus = function ($ele) {
-            try {
-              let result = [];
-              let start = false;
-              let startChapterExit = false;
-              for (let j = 0; j < $ele.length; j++) {
-                let tmp = $ele[j];
-                let href = tmp.attribs.href;
-                if (!href || href === '#' || href.indexOf('javascript') !== -1) {
-                  continue;
-                }
-                let txt = '';
-                if (tmp.children.length === 1 && tmp.children[0].type === 'text') {
-                  txt = tmp.children[0].data;
-                }
-                if (!txt) {
-                  for (let k = 0; k < tmp.children.length; k++) {
-                    if (tmp.children[k].name === 'span') {
-                      txt = $(tmp.children[k]).text();
-                      break;
-                    }
-                  }
-                  if (!txt) {
-                    continue;
-                  }
-                }
-                if ( startChapter && txt.indexOf(startChapter) !== -1) {
-                  //指定了开始章节则按定义的开始章节开始抓取
-                  start = true;
-                  startChapterExit = true;
-                } else if (!startChapter && (txt.indexOf("第一章") !== -1 || txt.indexOf("第1章") !== -1 || txt.indexOf("序") !== -1 || txt.indexOf("楔子") !== -1 || txt.indexOf("前言") !== -1
-                    || txt.indexOf("第一卷") !== -1 || txt.indexOf("第1卷") !== -1 || txt.indexOf("第一回") !== -1 || txt.indexOf("第1回") !== -1 || txt.indexOf("第01章") !== -1
-                    || txt.indexOf("第一页") !== -1 || txt.indexOf("第1页") !== -1 || txt.indexOf("0001") !== -1 || txt.indexOf("001") !== -1
-                    || txt.startsWith("1") || txt.startsWith("01")  || txt.startsWith("001") || txt.startsWith("一") ) ) {
-                  start = true;
-                }
-                if (start) {
-                  if (href.startsWith("//")) {
-                    href = url.substring(0, url.indexOf("//")) + href;
-                  } else if (href.startsWith("http")) {
-                    // do nothing
-                  } else if (href.startsWith("/")) {
-                    href = url.substring(0, url.indexOf("//") + 2) + url.substring(url.indexOf("//") + 2).substring(0, url.substring(url.indexOf("//") + 2).indexOf("/")) + href;
-                  } else {
-                    href = url.substring(0, url.lastIndexOf("/") + 1) + href;
-                  }
-                  result.push(href);
-                  if (endChapter &&  txt.indexOf(endChapter) !== -1) {
-                    //遇到指定的结束章节，结束
-                    break;
-                  }
-                }
-              }
+	          let checkMenus = function ($ele) {
+	            try {
+	              let result = [];
+	              let start = false;
+	              let startChapterExit = false;
+	              for (let j = 0; j < $ele.length; j++) {
+	                let tmp = $ele[j];
+	                let href = tmp.attribs.href;
+	                if (!href || href === '#' || href.indexOf('javascript') !== -1) {
+	                  continue;
+	                }
+	                let txt = $(tmp).text();
+	                if (!txt) {
+	                  continue;
+	                }
+	                txt = String(txt).trim();
+	                if (!txt) {
+	                  continue;
+	                }
+	                if ( startChapter && txt.indexOf(startChapter) !== -1) {
+	                  //指定了开始章节则按定义的开始章节开始抓取
+	                  start = true;
+	                  startChapterExit = true;
+	                } else if (!startChapter && (txt.indexOf("第一章") !== -1 || txt.indexOf("第1章") !== -1 || txt.indexOf("序") !== -1 || txt.indexOf("楔子") !== -1 || txt.indexOf("前言") !== -1
+	                    || txt.indexOf("第一卷") !== -1 || txt.indexOf("第1卷") !== -1 || txt.indexOf("第一回") !== -1 || txt.indexOf("第1回") !== -1 || txt.indexOf("第01章") !== -1
+	                    || txt.indexOf("第一页") !== -1 || txt.indexOf("第1页") !== -1 || txt.indexOf("0001") !== -1 || txt.indexOf("001") !== -1
+	                    || txt.startsWith("1") || txt.startsWith("01")  || txt.startsWith("001") || txt.startsWith("一") ) ) {
+	                  start = true;
+	                }
+	                if (start) {
+	                  let abs = absUrl(href, url);
+	                  if (!abs) {
+	                    continue;
+	                  }
+	                  result.push({ url: abs, title: txt });
+	                  if (endChapter &&  txt.indexOf(endChapter) !== -1) {
+	                    //遇到指定的结束章节，结束
+	                    break;
+	                  }
+	                }
+	              }
               if (startChapter && !startChapterExit) {
                 return '未找到您定义的开始章节';
               }
               return result;
-            } catch (e) {
-              console.log(e);
-              return '获取章节列表失败,错误信息:' + e;
-            }
-          }
-          let bookName = '';
+	            } catch (e) {
+	              console.log(e);
+	              return '获取章节列表失败,错误信息:' + e;
+	            }
+	          }
+	          let bookName = '';
           if (rule && rule.book_name) {
             bookName = $(rule.book_name).text();
             if (!bookName) {
@@ -223,42 +272,60 @@ window.services = {
               response.err_info = '智能解析书名失败，可能暂未支持该网站';
             }
           }
-          if (!bookName) {
-            callback(response);
-          } else {
-            task.name = bookName;
-            let menu ;
-            if (rule && rule.book_menu) {
-              let tmp = $(rule.book_menu);
-              menu = checkMenus(tmp);
-              if (!menu || menu.length <= 0) {
-                response.err_no = 5;
-                response.err_info = '获取章节列表失败，请检查您的json规则是否正确';
-              }
-            } else {
-              menu = getBookMenu();
-              if (!menu || menu.length <= 0) {
-                response.err_no = 6;
-                response.err_info = '智能解析章节列表失败，可能未识别到起始章节或暂未支持该网站';
-              }
-            }
-            if (typeof menu === 'string') {
-              response.err_no = 4;
-              response.err_info = menu;
-              callback(response);
-            } else if (!menu || menu.length <= 0) {
-              callback(response);
-            } else {
-              task.rule = rule;
-              task.filter = filter;
-              task.headers = headers;
-              task.menu = menu;
-              task.status = 0;
-              task.statusText = '任务处理中';
-              task.progress = '0';
-              task.curChapter = 0;
-              task.interval = time;
-              task.log = '';
+	          if (!bookName) {
+	            callback(response);
+	          } else {
+	            task.name = bookName;
+	            let menu ;
+	            if (rule && rule.book_menu) {
+	              let tmp = $(rule.book_menu);
+	              menu = checkMenus(tmp);
+	              if (!menu || menu.length <= 0) {
+	                response.err_no = 5;
+	                response.err_info = '获取章节列表失败，请检查您的json规则是否正确';
+	              }
+	            } else {
+	              menu = getBookMenu();
+	              if (!menu || menu.length <= 0) {
+	                response.err_no = 6;
+	                response.err_info = '智能解析章节列表失败，可能未识别到起始章节或暂未支持该网站';
+	              }
+	            }
+	            if (typeof menu === 'string') {
+	              response.err_no = 4;
+	              response.err_info = menu;
+	              callback(response);
+	            } else if (!menu || menu.length <= 0) {
+	              callback(response);
+	            } else {
+	              let menuUrls = [];
+	              let menuTitles = [];
+	              menu.forEach((one) => {
+	                if (!one) return;
+	                if (typeof one === 'string') {
+	                  menuUrls.push(one);
+	                  menuTitles.push('');
+	                } else if (one.url) {
+	                  menuUrls.push(one.url);
+	                  menuTitles.push(one.title || '');
+	                }
+	              });
+	              if (menuUrls.length <= 0) {
+	                response.err_no = 6;
+	                response.err_info = '智能解析章节列表失败，可能未识别到起始章节或暂未支持该网站';
+	                callback(response);
+	                return;
+	              }
+	              task.rule = rule;
+	              task.filter = filter;
+	              task.headers = headers;
+	              task.menu = menuUrls;
+	              task.menuTitle = menuTitles;
+	              task.status = 0;
+	              task.statusText = '任务处理中';
+	              task.progress = '0';
+	              task.concurrency = concurrency;
+	              task.page = page;
               if (proxy) {
                 proxy.unshift('localhost');
                 task.proxy = proxy;
@@ -285,7 +352,11 @@ window.services = {
     })
   },
   /*** 获取章节标题、章节内容并写入到临时文件 ***/
-  getChapter: (task, callback) => {
+  getChapter: (task, chapterIndex, callback) => {
+    if (typeof chapterIndex === 'function') {
+      callback = chapterIndex;
+      chapterIndex = null;
+    }
     let response = {};
     response.err_no = 0;
     response.err_info = "保存成功";
@@ -297,45 +368,122 @@ window.services = {
     if (!task || !task.name || !task.id || !task.menu || task.menu.length <= 0) {
       return;
     }
-    let path = rootPath + separator + task.id + '.txt';
-    if (!window.services.checkFile(path)) {
-      fs.createWriteStream(path);
+    let idx = typeof chapterIndex === 'number' ? chapterIndex : (task.curChapter || 0);
+    if (idx < 0 || idx >= task.menu.length) {
+      response.err_no = 98;
+      response.err_info = '章节索引越界';
+      callback(response);
+      return;
     }
-    let options = {encoding: null, gzip: true, headers: task.headers, timeout:10000};
-    //代理配置
-    if (task.proxy && task.proxy.length > 0) {
-      let proxy = "http://" + task.curProxy;
-      if ("http://localhost" !== proxy) {
-        let agent = task.menu[task.curChapter].startsWith("https") ? new HttpsProxyAgent({
-          keepAlive: true,
-          keepAliveMsecs: 5000,
-          maxSockets: 256,
-          maxFreeSockets: 256,
-          scheduling: 'lifo',
-          proxy
-        }) : new HttpProxyAgent({
-          keepAlive: true,
-          keepAliveMsecs: 5000,
-          maxSockets: 256,
-          maxFreeSockets: 256,
-          scheduling: 'lifo',
-          proxy
-        });
-        options.agent = agent;
+    let preferMenuTitle = '';
+    if (task.menuTitle && Array.isArray(task.menuTitle) && task.menuTitle[idx]) {
+      preferMenuTitle = String(task.menuTitle[idx]).trim();
+    }
+    let taskDir = rootPath + separator + task.id;
+    if (!fs.existsSync(taskDir)) {
+      fs.mkdirSync(taskDir);
+    }
+    let chapterPath = taskDir + separator + (idx + '.txt');
+    let baseOptions = {encoding: null, gzip: true, headers: task.headers, timeout:10000};
+
+    const buildOptions = function (pageUrl) {
+      let options = Object.assign({}, baseOptions);
+      //代理配置
+      if (task.proxy && task.proxy.length > 0) {
+        let proxy = "http://" + task.curProxy;
+        if ("http://localhost" !== proxy) {
+          let agent = pageUrl.startsWith("https") ? new HttpsProxyAgent({
+            keepAlive: true,
+            keepAliveMsecs: 5000,
+            maxSockets: 256,
+            maxFreeSockets: 256,
+            scheduling: 'lifo',
+            proxy
+          }) : new HttpProxyAgent({
+            keepAlive: true,
+            keepAliveMsecs: 5000,
+            maxSockets: 256,
+            maxFreeSockets: 256,
+            scheduling: 'lifo',
+            proxy
+          });
+          options.agent = agent;
+        }
       }
+      return options;
     }
-    request(task.menu[task.curChapter], options, async function (err, res, body) {
-      let logs = '<p><span style="margin-right: 4px;padding: 1px 3px;border-radius: 2px;background: #cacaca45;">'+ new Date().format("yyyy-MM-dd hh:mm:ss")+'</span>开始解析url为【'+task.menu[task.curChapter]+'】的章节</p>';
-      if (!err && res.statusCode === 200) {
-        let _html = window.services.getOkText(body);
-        if (!_html) {
-          logs += '<p style="color: red"><span style="margin-right: 4px;padding: 1px 3px;border-radius: 2px;background: #cacaca45;">'+ new Date().format("yyyy-MM-dd hh:mm:ss")+'</span>解析url【'+task.menu[task.curChapter]+'】出错，未获取到网页信息</p>';
-          response.err_no = 1;
-          response.err_info = '解析网站信息失败';
-          response.log = logs;
-          callback(response);
+
+    const loadPage = function (pageUrl) {
+      return new Promise((resolve) => {
+        request(pageUrl, buildOptions(pageUrl), function (err, res, body) {
+          resolve({ err, res, body });
+        });
+      });
+    }
+
+    const getNextPageUrl = function ($, currentUrl) {
+      if (!task.page || !task.page.enabled) {
+        return null;
+      }
+      let selector = (task.page.nextSelector || '').trim();
+      let hasText = (task.page.nextHasText || '').trim();
+      let noText = (task.page.nextNoText || '').trim();
+      let custom = !!(selector || hasText || noText);
+
+      const pickHref = function (ele) {
+        if (!ele) return null;
+        let href = null;
+        if (ele.name === 'a' && ele.attribs && ele.attribs.href) {
+          href = ele.attribs.href;
+        } else if (ele.attribs && ele.attribs.href) {
+          href = ele.attribs.href;
         } else {
-          let getChapterTitle = function () {
+          let a = $(ele).find('a[href]').first();
+          if (a && a.length > 0) {
+            href = a.attr('href');
+          }
+        }
+        if (!href || href === '#' || href.indexOf('javascript') !== -1) return null;
+        return absUrl(href, currentUrl);
+      }
+
+      if (custom) {
+        let eles = selector ? $(selector) : $('a');
+        if (!eles || eles.length <= 0) return null;
+        for (let i = 0; i < eles.length; i++) {
+          let ele = eles[i];
+          let txt = $(ele).text();
+          if (txt) txt = txt.trim();
+          if (noText && txt && txt.indexOf(noText) !== -1) {
+            return null;
+          }
+          if (hasText && (!txt || txt.indexOf(hasText) === -1)) {
+            continue;
+          }
+          let nextUrl = pickHref(ele);
+          if (nextUrl) return nextUrl;
+        }
+        return null;
+      }
+
+      // 默认规则：找文本包含“下一页”且总字数<=10的a标签
+      let as = $('a');
+      if (!as || as.length <= 0) return null;
+      for (let i = 0; i < as.length; i++) {
+        let a = as[i];
+        let txt = $(a).text();
+        if (!txt) continue;
+        txt = txt.trim();
+        if (txt.length > 10) continue;
+        if (txt.indexOf('下一页') === -1) continue;
+        let nextUrl = pickHref(a);
+        if (nextUrl) return nextUrl;
+      }
+      return null;
+    }
+
+    const parseOnePage = async function (_html, currentUrl, requireTitle) {
+      let getChapterTitle = function () {
             let result = '';
             let tmpTxt = '';
             let nameReg = [ '.box_con .bookname h1', '#book .content h1', '#box_con .bookname h1', '.readAreaBox h1', '.content-wrap', '.art_tit', '*title', '*name', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'h1 span'];
@@ -391,7 +539,12 @@ window.services = {
             return new Promise(async (resolve) => {
               let getDynamicContent = function (href){
                 return new Promise((resolve1) => {
-                  request( href, {encoding: null, gzip: true, headers: task.headers, timeout:15000}, function (err, res, body) {
+                  let abs = absUrl(href, currentUrl);
+                  if (!abs) {
+                    resolve1(null);
+                    return;
+                  }
+                  request( abs, {encoding: null, gzip: true, headers: task.headers, timeout:15000}, function (err, res, body) {
                     if (!err && res.statusCode === 200) {
                       resolve1(window.services.getOkText(body));
                     } else {
@@ -474,88 +627,155 @@ window.services = {
               resolve(result);
             });
           }
-          $ = cheerio.load(_html);
-          let title = '';
-          if (task.rule && task.rule.chapter_title) {
-            title = $(task.rule.chapter_title).text();
-            if (!title) {
-              logs += '<p style="color: red"><span style="margin-right: 4px;padding: 1px 3px;border-radius: 2px;background: #cacaca45;">'+ new Date().format("yyyy-MM-dd hh:mm:ss")+'</span>获取章节标题失败，请检查您的json规则是否正确</p>';
-              response.err_no = 2;
-              response.err_info = '获取章节标题失败，请检查您的json规则是否正确';
-            }
-          } else {
-            title = getChapterTitle();
-            if (!title) {
-              logs += '<p style="color: red"><span style="margin-right: 4px;padding: 1px 3px;border-radius: 2px;background: #cacaca45;">'+ new Date().format("yyyy-MM-dd hh:mm:ss")+'</span>智能解析章节标题失败，可能暂未支持该网站</p>';
-              response.err_no = 3;
-              response.err_info = '智能解析章节标题失败，可能暂未支持该网站';
-            }
-          }
+      $ = cheerio.load(_html);
+      let title = '';
+      if (requireTitle) {
+        if (task.rule && task.rule.chapter_title) {
+          title = $(task.rule.chapter_title).text();
           if (!title) {
-            response.log = logs;
-            callback(response);
-          } else {
-            let content = '';
-            if (task.rule && task.rule.chapter_content) {
-              content = $(task.rule.chapter_content).text();
-              if (!content) {
-                logs += '<p style="color: red"><span style="margin-right: 4px;padding: 1px 3px;border-radius: 2px;background: #cacaca45;">'+ new Date().format("yyyy-MM-dd hh:mm:ss")+'</span>获取章节正文失败，请检查您的json规则是否正确</p>';
-                response.err_no = 3;
-                response.err_info = '获取章节正文失败，请检查您的json规则是否正确';
-              }
-            } else {
-              content = await getChapterContent();
-              if (!content) {
-                logs += '<p style="color: red"><span style="margin-right: 4px;padding: 1px 3px;border-radius: 2px;background: #cacaca45;">'+ new Date().format("yyyy-MM-dd hh:mm:ss")+'</span>智能解析章节正文失败，可能暂未支持该网站</p>';
-                response.err_no = 4;
-                response.err_info = '智能解析章节正文失败，可能暂未支持该网站';
-              }
-            }
-            if (!content){
-              response.log = logs;
-              callback(response);
-            } else {
-              if(task.filter && task.filter.length > 0){
-                task.filter.forEach( (one_filter) => {
-                  if(one_filter && typeof one_filter === 'string'){
-                    let reg = new RegExp( one_filter , "g" );
-                    content = content.replace(reg,'');
-                  }
-                })
-              }
-              try {
-                let fd = fs.openSync(path ,'a');
-                fs.appendFileSync(fd,title+" \n");
-                fs.appendFileSync(fd,content+" \n");
-                fs.closeSync(fd);
-                logs += '<p><span style="margin-right: 4px;padding: 1px 3px;border-radius: 2px;background: #cacaca45;">'+ new Date().format("yyyy-MM-dd hh:mm:ss")+'</span>章节【'+title+'】抓取成功</p>';
-                response.path = path;
-              } catch (e) {
-                console.log(e);
-                logs += '<p style="color: red"><span style="margin-right: 4px;padding: 1px 3px;border-radius: 2px;background: #cacaca45;">'+ new Date().format("yyyy-MM-dd hh:mm:ss")+'</span>智能解析章节正文失败，可能暂未支持该网站</p>';
-                response.err_no = 5;
-                response.err_info = '记录保存章节内容出错';
-              }
-              response.log = logs;
-              callback(response);
-            }
+            return { err_no: 2, err_info: '获取章节标题失败，请检查您的json规则是否正确' };
           }
+        } else {
+          title = getChapterTitle();
+          if (!title) {
+            return { err_no: 3, err_info: '智能解析章节标题失败，可能暂未支持该网站' };
+          }
+        }
+        if (!title) {
+          return { err_no: 3, err_info: '获取章节标题失败' };
         }
       } else {
-        let info = "访问章节地址出错, ";
-        if (err){
-          console.log(err);
-          info += "错误信息:" + err ;
-        } else {
-          info += "请求状态码:" + res.statusCode ;
+        // 后续分页不强制要求标题存在（部分站点分页页不包含标题）
+        title = '';
+      }
+      let content = '';
+      if (task.rule && task.rule.chapter_content) {
+        content = $(task.rule.chapter_content).text();
+        if (!content) {
+          return { err_no: 3, err_info: '获取章节正文失败，请检查您的json规则是否正确' };
         }
-        logs += '<p style="color: red"><span style="margin-right: 4px;padding: 1px 3px;border-radius: 2px;background: #cacaca45;">'+ new Date().format("yyyy-MM-dd hh:mm:ss")+'</span> '+info+' </p>';
-        response.err_no = 99;
-        response.err_info = '访问章节地址出错，错误信息:' + err;
-        response.log = logs;
+      } else {
+        content = await getChapterContent();
+        if (!content) {
+          return { err_no: 4, err_info: '智能解析章节正文失败，可能暂未支持该网站' };
+        }
+      }
+      if (!content) {
+        return { err_no: 4, err_info: '获取章节正文失败' };
+      }
+      if(task.filter && task.filter.length > 0){
+        try {
+          task.filter.forEach((one_filter) => {
+            let reg = buildFilterRegExp(one_filter)
+            if (!reg) {
+              return
+            }
+            content = content.replace(reg,'')
+          })
+        } catch (e) {
+          return { err_no: 7, err_info: '过滤规则正则不合法，请检查。错误信息:' + e }
+        }
+      }
+      let nextUrl = getNextPageUrl($, currentUrl);
+      return { err_no: 0, title, content, nextUrl };
+    };
+
+    ;(async () => {
+      try {
+        const normalizePageContent = function (txt, isFirstPage) {
+          if (!txt) return ''
+          let s = String(txt).replace(/\r/g, '')
+          // 只清理分页边界的多余空白/换行，保证章节内部连贯
+          if (!isFirstPage) {
+            s = s.replace(/^\s+/, '')
+          }
+          s = s.replace(/\s+$/, '')
+          return s
+        }
+
+        let firstUrl = task.menu[idx];
+        let pageUrl = firstUrl;
+        let contents = [];
+        let title = preferMenuTitle || '';
+        let visited = {};
+        let maxPages = 50;
+        for (let pageNo = 0; pageNo < maxPages; pageNo++) {
+          if (!pageUrl) {
+            break;
+          }
+          if (visited[pageUrl]) {
+            response.err_no = 96;
+            response.err_info = '检测到分页链接循环，已终止该章节爬取';
+            callback(response);
+            return;
+          }
+          visited[pageUrl] = true;
+
+          let loaded = await loadPage(pageUrl);
+          if (loaded.err || !loaded.res || loaded.res.statusCode !== 200) {
+            response.err_no = 99;
+            response.err_info = '访问章节地址出错，错误信息:' + (loaded.err || (loaded.res && loaded.res.statusCode));
+            callback(response);
+            return;
+          }
+          let _html = window.services.getOkText(loaded.body);
+          if (!_html) {
+            response.err_no = 1;
+            response.err_info = '解析网站信息失败';
+            callback(response);
+            return;
+          }
+          // 如果书籍目录页已经解析到章节标题，则优先使用目录标题，避免因内容页标题解析差异导致“标题被修改/缺数字”
+          let parsed = await parseOnePage(_html, pageUrl, pageNo === 0 && !preferMenuTitle);
+          if (!parsed || parsed.err_no !== 0) {
+            response.err_no = parsed ? parsed.err_no : 5;
+            response.err_info = parsed ? parsed.err_info : '解析章节失败';
+            callback(response);
+            return;
+          }
+          if (pageNo === 0 && !preferMenuTitle) {
+            title = parsed.title;
+          }
+          contents.push(normalizePageContent(parsed.content, pageNo === 0));
+
+          if (!task.page || !task.page.enabled) {
+            break;
+          }
+          let nextUrl = parsed.nextUrl;
+          if (!nextUrl) {
+            break;
+          }
+          if (nextUrl === pageUrl) {
+            break;
+          }
+          if (pageNo === maxPages - 1) {
+            response.err_no = 95;
+            response.err_info = '分页数量过多，已终止该章节爬取';
+            callback(response);
+            return;
+          }
+          pageUrl = nextUrl;
+        }
+        if (!title || contents.length <= 0) {
+          response.err_no = 5;
+          response.err_info = '章节内容为空';
+          callback(response);
+          return;
+        }
+        let fullContent = contents
+          .filter((c) => c && String(c).trim() !== '')
+          .reduce((acc, cur) => acc ? (acc + "\n" + cur) : cur, '');
+        fs.writeFileSync(chapterPath, title + " \n" + fullContent + " \n");
+        response.path = chapterPath;
+        response.title = title;
+        callback(response);
+      } catch (e) {
+        console.log(e);
+        response.err_no = 97;
+        response.err_info = '爬取分页章节出错，错误信息:' + e;
         callback(response);
       }
-    });
+    })();
   },
   /***  检查文件是否存在并可写  ***/
   checkFile: (path) => {
@@ -586,6 +806,44 @@ window.services = {
     }
     return 'ok';
   },
+  /***  合并保存书籍章节内容  ***/
+  saveBook: (task, savePath) => {
+    try {
+      let separator = window.platform.isWindows ? "\u005C" : "/";
+      let rootPath = window.utools.getPath("temp") + separator + "scan-book";
+      let oldPath = rootPath + separator + task.id + '.txt';
+      let taskDir = rootPath + separator + task.id;
+      if (!task || !task.id || !task.menu || task.menu.length <= 0) {
+        return '任务数据不完整';
+      }
+
+      // 兼容旧版本：单文件临时存储
+      if (!fs.existsSync(taskDir) && fs.existsSync(oldPath)) {
+        let buf = fs.readFileSync(oldPath);
+        fs.writeFileSync(savePath, buf);
+        return 'ok';
+      }
+      if (!fs.existsSync(taskDir)) {
+        return '未找到临时文件，请重新爬取';
+      }
+
+      let fd = fs.openSync(savePath ,'w');
+      for (let i = 0; i < task.menu.length; i++) {
+        let chapterPath = taskDir + separator + (i + '.txt');
+        if (fs.existsSync(chapterPath)) {
+          let buf = fs.readFileSync(chapterPath);
+          fs.writeSync(fd, buf);
+          // 章节之间补一个换行，避免内容连在一起
+          fs.writeSync(fd, Buffer.from("\n"));
+        }
+      }
+      fs.closeSync(fd);
+    } catch (e) {
+      console.log(e);
+      return '保存出错,错误信息：' + e;
+    }
+    return 'ok';
+  },
   /***  清空临时目录中本插件的文件  ***/
   emptyTempDir: () => {
     try {
@@ -594,7 +852,11 @@ window.services = {
       const files = fs.readdirSync(path);
       files.forEach(file => {
         const filePath = path + separator + file;
-        fs.unlinkSync(filePath);
+        if (fs.statSync(filePath).isDirectory()) {
+          fs.rmdirSync(filePath, { recursive: true });
+        } else {
+          fs.unlinkSync(filePath);
+        }
       });
     } catch (e) {
       return false;
@@ -605,9 +867,13 @@ window.services = {
   deleteTemp: (id) => {
     try {
       let separator = window.platform.isWindows ? "\u005C" : "/";
-      let path = window.utools.getPath("temp") + separator + "scan-book" + separator + id + ".txt" ;
-      if (window.services.checkFile(path)) {
-        fs.unlinkSync(path);
+      let rootPath = window.utools.getPath("temp") + separator + "scan-book";
+      let oldPath = rootPath + separator + id + ".txt" ;
+      let taskDir = rootPath + separator + id;
+      if (fs.existsSync(taskDir) && fs.statSync(taskDir).isDirectory()) {
+        fs.rmdirSync(taskDir, { recursive: true });
+      } else if (window.services.checkFile(oldPath)) {
+        fs.unlinkSync(oldPath);
       }
     } catch (e) {
       console.log(e);
@@ -638,5 +904,3 @@ window.services = {
     }
   }
 }
-
-

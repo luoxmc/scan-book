@@ -37,18 +37,86 @@ html, body {
     color: #fff;
     z-index: 999999 !important;
   }
-  .book-status2 {
-    color: rgb(115, 205, 32, 0.9);
-  }
-  .book-status1 {
-    color: rgb(207, 151, 24, 0.9);
-  }
-  .book-status4 {
-    color: rgba(209, 26, 26, 0.9);
-  }
   .lx-code-p {
     margin: 0;
   }
+}
+
+.book-status2 {
+  color: rgb(115, 205, 32, 0.9);
+}
+.book-status1 {
+  color: rgb(207, 151, 24, 0.9);
+}
+.book-status4 {
+  color: rgba(209, 26, 26, 0.9);
+}
+.book-status3 {
+  color: rgba(209, 26, 26, 0.9);
+}
+
+.chapter-index-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.2rem;
+  height: 1.4rem;
+  padding: 0 0.35rem;
+  margin-right: 0.6rem;
+  border: 1px solid rgba(120, 120, 120, 0.65);
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  line-height: 1;
+  flex-shrink: 0;
+  color: rgba(120, 120, 120, 0.95);
+}
+.chapter-row {
+  height: 44px;
+  box-sizing: border-box;
+  padding: 0 8px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+  display: flex;
+  align-items: center;
+}
+.chapter-row--has-error {
+  border-bottom: none;
+}
+.chapter-col-title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  overflow: hidden;
+}
+.chapter-title-text {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.chapter-error-row {
+  height: 22px;
+  box-sizing: border-box;
+  padding: 0 8px 0 calc(8px + 2.2rem + 0.6rem);
+  line-height: 22px;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: rgba(209, 26, 26, 0.9);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+}
+.chapter-col-status {
+  width: 72px;
+  text-align: right;
+  flex-shrink: 0;
+}
+.chapter-col-action {
+  width: 96px;
+  text-align: right;
+  flex-shrink: 0;
 }
 
 @media (prefers-color-scheme: light) {
@@ -61,6 +129,12 @@ html, body {
   body {
     background-color: #303133;
     color: white;
+  }
+  .chapter-row {
+    border-bottom-color: rgba(255, 255, 255, 0.12);
+  }
+  .chapter-error-row {
+    border-bottom-color: rgba(255, 255, 255, 0.12);
   }
   ::-webkit-scrollbar-track-piece {
     background-color: #303133;
